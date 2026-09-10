@@ -103,14 +103,13 @@ exports.approveOrder = async (req, res) => {
     order.status = "Awaiting Downpayment";
     await order.save();
 
-    // Send email — don't fail the request if email fails, just log it
-    try {
-      await sendApprovalEmail(order);
-    } catch (emailErr) {
-      console.error("Email failed (order still approved):", emailErr.message);
-    }
+    // Reply immediately — don't make the admin wait on SMTP/email delivery.
+    res.json({ order });
 
-    res.json({ order, emailSent: true });
+    // Send the approval email in the background; log (don't crash) if it fails.
+    sendApprovalEmail(order).catch((emailErr) =>
+      console.error("Email failed (order still approved):", emailErr.message)
+    );
   } catch (err) {
     console.error("approveOrder:", err);
     res.status(500).json({ message: "Server error", detail: err.message });

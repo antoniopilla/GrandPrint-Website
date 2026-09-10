@@ -1,15 +1,19 @@
 const nodemailer = require("nodemailer");
 require("dotenv").config();
 
-const sendApprovalEmail = async (order) => {
-  const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER,
+    // trim guards against stray whitespace pasted into the env var
+    pass: (process.env.EMAIL_PASS || "").trim(),
+  },
+  connectionTimeout: 10000, // fail fast instead of hanging if SMTP is unreachable
+  greetingTimeout: 10000,
+  socketTimeout: 15000,
+});
 
+const sendApprovalEmail = async (order) => {
   const total = Number(order.price);
   const dp = (total * 0.5).toLocaleString("en-PH", { minimumFractionDigits: 2 });
   const totalFmt = total.toLocaleString("en-PH", { minimumFractionDigits: 2 });
