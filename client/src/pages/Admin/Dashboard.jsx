@@ -1,8 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-
-const API = "http://localhost:5000";
+import { API } from "../../config";
 
 const TABS = [
   { key: "pending",   label: "Pending Approval",   dot: "var(--orange)",  statuses: ["Pending Approval"] },
@@ -99,7 +98,7 @@ export default function AdminDashboard() {
       <aside style={s.sidebar}>
         <div style={s.sideHead}>
           <p style={s.sideEye}>Admin Panel</p>
-          <p style={s.sideName}>Modify Printing</p>
+          <p style={s.sideName}>GrandPrint</p>
         </div>
 
         <nav style={s.nav}>
@@ -287,7 +286,7 @@ function OrderCard({ order, onApprove, onStatusChange, actionLoading }) {
             <>
               {order.paymentProof && (
                 <a
-                  href={`http://localhost:5000/${order.paymentProof.replace(/\\/g, "/")}`}
+                  href={order.paymentProof}
                   target="_blank"
                   rel="noreferrer"
                   style={{ fontSize: 13, fontWeight: 600, color: "var(--text2)", alignSelf: "center" }}

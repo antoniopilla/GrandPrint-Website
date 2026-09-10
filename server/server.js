@@ -1,6 +1,5 @@
 const express = require("express");
 const cors = require("cors");
-const fs = require("fs");
 require("dotenv").config();
 const connectDB = require("./config/db");
 const orderRoutes = require("./routes/orderRoutes");
@@ -9,22 +8,27 @@ const customerRoutes = require("./routes/customerRoutes");
 
 const app = express();
 
-// Make sure upload folders exist on startup
-["uploads/designs", "uploads/payment"].forEach((dir) => {
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-});
-
 connectDB();
 
-app.use(cors());
+// CORS: restrict to the allowed origins from CLIENT_URL (comma-separated).
+// When unset (local dev), allow all origins.
+const allowedOrigins = (process.env.CLIENT_URL || "")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+app.use(
+  cors({
+    origin: allowedOrigins.length ? allowedOrigins : true,
+  })
+);
 app.use(express.json());
-app.use("/uploads", express.static("uploads"));
 
 app.use("/api/orders", orderRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/customers", customerRoutes);
 
-app.get("/", (req, res) => res.send("Modify Printing API is running."));
+app.get("/", (req, res) => res.send("GrandPrint API is running."));
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));

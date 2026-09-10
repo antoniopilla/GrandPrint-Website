@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { API } from "../../config";
 
-const API = "http://localhost:5000";
 const STEPS = ["Your Details", "Order Info", "Review & Submit"];
 
 // ── Validators ──────────────────────────────────────────────────────────────

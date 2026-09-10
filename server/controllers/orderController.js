@@ -1,10 +1,11 @@
 const Order = require("../models/Order");
 const sendApprovalEmail = require("../utils/emailService");
+const { uploadBuffer } = require("../config/cloudinary");
 
 const generateOrderId = async () => {
   let id, exists = true;
   while (exists) {
-    id = "MP-" + Math.floor(100000 + Math.random() * 900000);
+    id = "GP-" + Math.floor(100000 + Math.random() * 900000);
     exists = await Order.exists({ orderId: id });
   }
   return id;
@@ -16,7 +17,13 @@ exports.createOrder = async (req, res) => {
     const { customerName, email, contactNumber, productType, width, height, pieces, notes } =
       req.body;
 
-      const order = new Order({
+    let designFile = null;
+    if (req.file) {
+      const result = await uploadBuffer(req.file.buffer, "grandprint/designs");
+      designFile = result.secure_url;
+    }
+
+    const order = new Order({
       orderId: await generateOrderId(),
       customerName,
       email,
@@ -26,7 +33,7 @@ exports.createOrder = async (req, res) => {
       height: Number(height),
       pieces: Number(pieces),
       notes: notes || "",
-      designFile: req.file ? req.file.path : null,
+      designFile,
     });
 
     await order.save();

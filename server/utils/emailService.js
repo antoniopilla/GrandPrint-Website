@@ -23,7 +23,7 @@ const sendApprovalEmail = async (order) => {
 
   <!-- Header -->
   <div style="background:#1d1d1f;padding:32px 40px;">
-    <p style="margin:0;font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#6e6e73;">Modify Printing</p>
+    <p style="margin:0;font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#6e6e73;">${process.env.BUSINESS_NAME || "GrandPrint"}</p>
     <h1 style="margin:8px 0 0;font-size:24px;font-weight:700;color:#ffffff;line-height:1.2;">Order Approved ✓</h1>
   </div>
 
@@ -73,13 +73,13 @@ const sendApprovalEmail = async (order) => {
     </div>
 
     <p style="font-size:15px;line-height:1.8;color:#6e6e73;margin:0;">
-      If you have any questions, feel free to message us on Facebook. We appreciate your trust in <strong>${process.env.BUSINESS_NAME || "Modify Printing"}</strong> and look forward to delivering your order!
+      If you have any questions, feel free to message us on Facebook. We appreciate your trust in <strong>${process.env.BUSINESS_NAME || "GrandPrint"}</strong> and look forward to delivering your order!
     </p>
   </div>
 
   <!-- Footer -->
   <div style="border-top:1px solid #d2d2d7;padding:20px 40px;text-align:center;">
-    <p style="margin:0;font-size:12px;color:#aeaeb2;">${process.env.BUSINESS_NAME || "Modify Printing"} · This is an automated email, please do not reply.</p>
+    <p style="margin:0;font-size:12px;color:#aeaeb2;">${process.env.BUSINESS_NAME || "GrandPrint"} · This is an automated email, please do not reply.</p>
   </div>
 
 </div>
@@ -87,7 +87,7 @@ const sendApprovalEmail = async (order) => {
 </html>`;
 
   await transporter.sendMail({
-    from: `"${process.env.BUSINESS_NAME || "Modify Printing"}" <${process.env.EMAIL_USER}>`,
+    from: `"${process.env.BUSINESS_NAME || "GrandPrint"}" <${process.env.EMAIL_USER}>`,
     to: order.email,
     subject: `Your Order ${order.orderId} is Approved — ₱${totalFmt}`,
     html,

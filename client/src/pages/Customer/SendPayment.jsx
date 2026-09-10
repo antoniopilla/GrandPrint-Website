@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
-
-const API = "http://localhost:5000";
+import { API } from "../../config";
 
 const peso = (n) =>
   `₱${Number(n || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}`;
@@ -71,7 +70,7 @@ export default function SendPayment() {
       {/* Nav */}
       <nav style={s.nav}>
         <div style={s.navInner}>
-          <span style={s.brand} onClick={() => nav("/")}>Modify Printing</span>
+          <span style={s.brand} onClick={() => nav("/")}>GrandPrint</span>
           <button style={s.homeLink} onClick={() => nav("/")}>Home</button>
         </div>
       </nav>
@@ -102,7 +101,7 @@ export default function SendPayment() {
               <div style={s.lookupRow}>
                 <input
                   style={s.input}
-                  placeholder="e.g. MP-123456"
+                  placeholder="e.g. GP-123456"
                   value={orderId}
                   onChange={(e) => setOrderId(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && fetchOrder()}

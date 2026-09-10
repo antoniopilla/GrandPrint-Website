@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { API } from "../../config";
 
 export default function AdminLogin() {
   const nav = useNavigate();
@@ -13,7 +14,7 @@ export default function AdminLogin() {
     setLoading(true);
     setError("");
     try {
-      const res = await axios.post("http://localhost:5000/api/admin/login", { password: pw });
+      const res = await axios.post(`${API}/api/admin/login`, { password: pw });
       if (res.data.success) {
         sessionStorage.setItem("adminToken", res.data.token);
         nav("/admin", { replace: true });

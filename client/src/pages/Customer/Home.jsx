@@ -8,7 +8,7 @@ export default function Home() {
       {/* Nav */}
       <nav style={s.nav}>
         <div style={s.navInner}>
-          <span style={s.brand}>Modify Printing</span>
+          <span style={s.brand}>GrandPrint</span>
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
             <button style={s.adminLink} onClick={() => nav("/pay")}>
               Pay Order
@@ -85,7 +85,7 @@ export default function Home() {
 
       {/* Footer */}
       <footer style={s.footer}>
-        <p>© {new Date().getFullYear()} Modify Printing · All rights reserved</p>
+        <p>© {new Date().getFullYear()} GrandPrint · All rights reserved</p>
       </footer>
     </div>
   );
