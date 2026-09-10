@@ -40,6 +40,9 @@ export default function OrderConfirmation() {
         </p>
 
         <button style={s.btn} onClick={() => nav("/")}>Back to Home</button>
+        <button style={s.payLink} onClick={() => nav(`/pay/${order.orderId}`)}>
+          Already received your quote? Submit payment →
+        </button>
       </div>
     </div>
   );
@@ -71,4 +74,5 @@ const s = {
   nBody: { fontSize: 13, color: "var(--text2)", lineHeight: 1.5 },
   emailNote: { fontSize: 13, background: "var(--bg2)", borderRadius: "var(--r-sm)", padding: "12px 16px", marginBottom: 24, color: "var(--text2)", lineHeight: 1.6 },
   btn: { background: "var(--blue)", color: "#fff", border: "none", borderRadius: 980, padding: "13px 32px", fontSize: 15, fontWeight: 600 },
+  payLink: { display: "block", margin: "16px auto 0", background: "none", border: "none", color: "var(--text2)", fontSize: 14, fontWeight: 500 },
 };

@@ -9,9 +9,14 @@ export default function Home() {
       <nav style={s.nav}>
         <div style={s.navInner}>
           <span style={s.brand}>Modify Printing</span>
-          <button style={s.adminLink} onClick={() => nav("/admin/login")}>
-            Admin
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <button style={s.adminLink} onClick={() => nav("/pay")}>
+              Pay Order
+            </button>
+            <button style={s.adminLink} onClick={() => nav("/admin/login")}>
+              Admin
+            </button>
+          </div>
         </div>
       </nav>
 
