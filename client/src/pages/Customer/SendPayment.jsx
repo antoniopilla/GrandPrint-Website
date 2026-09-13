@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import { API } from "../../config";
+import ThemeToggle from "../../ThemeToggle";
 
 const peso = (n) =>
   `₱${Number(n || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}`;
@@ -71,7 +72,10 @@ export default function SendPayment() {
       <nav style={s.nav}>
         <div style={s.navInner}>
           <span style={s.brand} onClick={() => nav("/")}>GrandPrint</span>
-          <button style={s.homeLink} onClick={() => nav("/")}>Home</button>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <button style={s.homeLink} onClick={() => nav("/")}>Home</button>
+            <ThemeToggle />
+          </div>
         </div>
       </nav>
 
@@ -187,7 +191,7 @@ export default function SendPayment() {
 
 const s = {
   root: { minHeight: "100vh", background: "var(--bg2)", display: "flex", flexDirection: "column" },
-  nav: { borderBottom: "1px solid var(--border)", background: "rgba(255,255,255,0.85)", backdropFilter: "blur(20px)", position: "sticky", top: 0, zIndex: 100 },
+  nav: { borderBottom: "1px solid var(--border)", background: "var(--nav-bg)", backdropFilter: "blur(20px)", position: "sticky", top: 0, zIndex: 100 },
   navInner: { maxWidth: 1000, margin: "0 auto", padding: "0 32px", height: 56, display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" },
   brand: { fontWeight: 700, fontSize: 16, letterSpacing: "-0.01em", cursor: "pointer" },
   homeLink: { background: "none", border: "none", fontSize: 14, fontWeight: 500, color: "var(--text2)", padding: "6px 12px", borderRadius: 8 },
@@ -198,7 +202,7 @@ const s = {
   sub: { fontSize: 15, color: "var(--text2)", lineHeight: 1.65, marginBottom: 28 },
   lookupRow: { display: "flex", gap: 10 },
   input: { flex: 1, background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: "var(--r-sm)", padding: "13px 16px", fontSize: 15, color: "var(--text)", outline: "none" },
-  checkBtn: { background: "var(--text)", color: "#fff", border: "none", borderRadius: "var(--r-sm)", padding: "0 20px", fontSize: 14, fontWeight: 600, whiteSpace: "nowrap" },
+  checkBtn: { background: "var(--ink)", color: "var(--ink-text)", border: "none", borderRadius: "var(--r-sm)", padding: "0 20px", fontSize: 14, fontWeight: 600, whiteSpace: "nowrap" },
   errorNote: { color: "var(--red)", fontSize: 13, marginTop: 12, lineHeight: 1.5 },
   orderBox: { marginTop: 24, background: "var(--bg2)", borderRadius: "var(--r)", padding: "22px" },
   orderHead: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 16 },

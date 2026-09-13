@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { API } from "../../config";
+import ThemeToggle from "../../ThemeToggle";
 
 export default function AdminLogin() {
   const nav = useNavigate();
@@ -28,6 +29,7 @@ export default function AdminLogin() {
 
   return (
     <div style={s.root}>
+      <ThemeToggle floating />
       <div style={s.card} className="au">
         <div style={s.iconWrap}>🔒</div>
         <h1 style={s.title}>Admin Login</h1>

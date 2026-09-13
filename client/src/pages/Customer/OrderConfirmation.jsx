@@ -1,4 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom";
+import ThemeToggle from "../../ThemeToggle";
 
 export default function OrderConfirmation() {
   const nav = useNavigate();
@@ -9,6 +10,7 @@ export default function OrderConfirmation() {
 
   return (
     <div style={s.root}>
+      <ThemeToggle floating />
       <div style={s.card} className="au">
         <div style={s.check}>✓</div>
         <h1 style={s.title}>Order Submitted!</h1>

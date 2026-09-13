@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { API } from "../../config";
+import ThemeToggle from "../../ThemeToggle";
 
 const TABS = [
   { key: "pending",   label: "Pending Approval",   dot: "var(--orange)",  statuses: ["Pending Approval"] },
@@ -35,7 +36,7 @@ export default function AdminDashboard() {
   const fetchOrders = useCallback(async () => {
     try {
       const res = await axios.get(`${API}/api/orders`, authHeaders());
-      setOrders(res.data);
+      setOrders(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       if (err.response?.status === 401) {
         sessionStorage.removeItem("adminToken");
@@ -139,9 +140,12 @@ export default function AdminDashboard() {
             <h1 style={s.pageTitle}>{currentTab.label}</h1>
             <p style={s.pageSub}>{shown.length} order{shown.length !== 1 ? "s" : ""}</p>
           </div>
-          <button style={s.refreshBtn} onClick={fetchOrders} title="Refresh orders">
-            ↻ Refresh
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <ThemeToggle />
+            <button style={s.refreshBtn} onClick={fetchOrders} title="Refresh orders">
+              ↻ Refresh
+            </button>
+          </div>
         </div>
 
         {loading ? (
@@ -332,7 +336,7 @@ function ActionBtn({ children, color, bg, onClick, loading }) {
 
 const s = {
   root: { display: "flex", minHeight: "100vh", background: "var(--bg2)", fontFamily: "var(--font)" },
-  sidebar: { width: 230, background: "var(--text)", display: "flex", flexDirection: "column", padding: "28px 16px", position: "sticky", top: 0, height: "100vh", flexShrink: 0 },
+  sidebar: { width: 230, background: "var(--ink)", display: "flex", flexDirection: "column", padding: "28px 16px", position: "sticky", top: 0, height: "100vh", flexShrink: 0 },
   sideHead: { marginBottom: 32, padding: "0 8px" },
   sideEye: { fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(255,255,255,0.35)", marginBottom: 4 },
   sideName: { fontSize: 16, fontWeight: 700, color: "#fff", letterSpacing: "-0.01em" },

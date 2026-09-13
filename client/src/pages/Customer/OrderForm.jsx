@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { API } from "../../config";
+import ThemeToggle from "../../ThemeToggle";
 
 const STEPS = ["Your Details", "Order Info", "Review & Submit"];
 
@@ -87,7 +88,10 @@ export default function OrderForm() {
           ← {step === 0 ? "Home" : "Back"}
         </button>
         <span style={s.navTitle}>New Order</span>
-        <span style={s.navStep}>{step + 1} / {STEPS.length}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={s.navStep}>{step + 1} / {STEPS.length}</span>
+          <ThemeToggle />
+        </div>
       </nav>
 
       {/* Progress bar */}

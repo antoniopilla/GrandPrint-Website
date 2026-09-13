@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import ThemeToggle from "../../ThemeToggle";
 
 export default function Home() {
   const nav = useNavigate();
@@ -9,13 +10,14 @@ export default function Home() {
       <nav style={s.nav}>
         <div style={s.navInner}>
           <span style={s.brand}>GrandPrint</span>
-          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <button style={s.adminLink} onClick={() => nav("/pay")}>
               Pay Order
             </button>
             <button style={s.adminLink} onClick={() => nav("/admin/login")}>
               Admin
             </button>
+            <ThemeToggle />
           </div>
         </div>
       </nav>
@@ -136,7 +138,7 @@ const STEPS = [
 
 const s = {
   page: { minHeight: "100vh", display: "flex", flexDirection: "column", background: "var(--bg)" },
-  nav: { borderBottom: "1px solid var(--border)", background: "rgba(255,255,255,0.85)", backdropFilter: "blur(20px)", position: "sticky", top: 0, zIndex: 100 },
+  nav: { borderBottom: "1px solid var(--border)", background: "var(--nav-bg)", backdropFilter: "blur(20px)", position: "sticky", top: 0, zIndex: 100 },
   navInner: { maxWidth: 1000, margin: "0 auto", padding: "0 32px", height: 56, display: "flex", alignItems: "center", justifyContent: "space-between" },
   brand: { fontWeight: 700, fontSize: 16, letterSpacing: "-0.01em" },
   adminLink: { background: "none", border: "none", fontSize: 14, fontWeight: 500, color: "var(--text2)", padding: "6px 12px", borderRadius: 8, transition: "color .15s" },
@@ -161,7 +163,7 @@ const s = {
   stepNum: { width: 32, height: 32, background: "var(--bg2)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 14, flexShrink: 0, color: "var(--text2)" },
   stepHead: { fontWeight: 600, fontSize: 16, marginBottom: 4 },
   stepBody: { fontSize: 14, color: "var(--text2)", lineHeight: 1.6 },
-  banner: { background: "var(--text)", padding: "80px 32px", textAlign: "center" },
+  banner: { background: "var(--ink)", padding: "80px 32px", textAlign: "center" },
   bannerInner: { maxWidth: 500, margin: "0 auto" },
   bannerTitle: { fontSize: "clamp(28px,4vw,40px)", fontWeight: 800, color: "#fff", letterSpacing: "-0.025em", marginBottom: 12 },
   bannerSub: { fontSize: 16, color: "rgba(255,255,255,0.6)", marginBottom: 32 },
