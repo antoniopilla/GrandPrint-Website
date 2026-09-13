@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { API } from "../../config";
 import ThemeToggle from "../../ThemeToggle";
+import { Lock } from "lucide-react";
 
 export default function AdminLogin() {
   const nav = useNavigate();
@@ -31,7 +32,7 @@ export default function AdminLogin() {
     <div style={s.root}>
       <ThemeToggle floating />
       <div style={s.card} className="au">
-        <div style={s.iconWrap}>🔒</div>
+        <div style={s.iconWrap}><Lock size={30} strokeWidth={1.75} /></div>
         <h1 style={s.title}>Admin Login</h1>
         <p style={s.sub}>Enter the admin password to manage orders.</p>
 

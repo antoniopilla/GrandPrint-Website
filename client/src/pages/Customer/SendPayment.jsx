@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import { API } from "../../config";
 import ThemeToggle from "../../ThemeToggle";
+import { Check } from "lucide-react";
 
 const peso = (n) =>
   `₱${Number(n || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}`;
@@ -83,7 +84,7 @@ export default function SendPayment() {
         <div style={s.card} className="au">
           {submitted ? (
             <div style={s.doneBox}>
-              <div style={s.check}>✓</div>
+              <div style={s.check}><Check size={30} strokeWidth={3} /></div>
               <h1 style={s.title}>Payment Submitted!</h1>
               <p style={s.sub}>
                 Thanks! We've received your receipt for order{" "}
@@ -160,7 +161,7 @@ export default function SendPayment() {
                           style={{ display: "none" }}
                         />
                         <span style={s.fileBtn}>
-                          {file ? "✓ " + file.name : "Choose receipt image"}
+                          {file ? (<><Check size={15} style={{ verticalAlign: "-3px", marginRight: 6 }} />{file.name}</>) : "Choose receipt image"}
                         </span>
                       </label>
 

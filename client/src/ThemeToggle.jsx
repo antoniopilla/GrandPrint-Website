@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Sun, Moon } from "lucide-react";
 
 // Reads the theme applied to <html> by the early-load script in index.html.
 const getTheme = () =>
@@ -30,7 +31,7 @@ export default function ThemeToggle({ floating = false }) {
       title={isDark ? "Switch to light mode" : "Switch to dark mode"}
       style={{ ...s.btn, ...(floating ? s.floating : null) }}
     >
-      <span style={{ fontSize: 16, lineHeight: 1 }}>{isDark ? "☀️" : "🌙"}</span>
+      {isDark ? <Sun size={18} /> : <Moon size={18} />}
     </button>
   );
 }

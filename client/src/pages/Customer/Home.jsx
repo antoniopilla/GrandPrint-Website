@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import ThemeToggle from "../../ThemeToggle";
+import { Image, Frame, Sticker } from "lucide-react";
 
 export default function Home() {
   const nav = useNavigate();
@@ -49,7 +50,7 @@ export default function Home() {
               className="au"
               style={{ ...s.card, animationDelay: `${0.05 + i * 0.08}s` }}
             >
-              <div style={s.cardIcon}>{svc.icon}</div>
+              <div style={s.cardIcon}><svc.Icon size={30} strokeWidth={1.75} /></div>
               <h3 style={s.cardTitle}>{svc.name}</h3>
               <p style={s.cardDesc}>{svc.desc}</p>
             </div>
@@ -124,9 +125,9 @@ function Btn({ children, primary, large, onClick }) {
 }
 
 const SERVICES = [
-  { icon: "🖼️", name: "Tarpaulin", desc: "Weather-resistant large-format prints for events, storefronts, and banners." },
-  { icon: "🪧", name: "Sintra Board", desc: "Rigid PVC boards for signage, directories, and indoor/outdoor displays." },
-  { icon: "✦", name: "Stickers", desc: "Custom cut stickers for branding, packaging, promotions, and more." },
+  { Icon: Image, name: "Tarpaulin", desc: "Weather-resistant large-format prints for events, storefronts, and banners." },
+  { Icon: Frame, name: "Sintra Board", desc: "Rigid PVC boards for signage, directories, and indoor/outdoor displays." },
+  { Icon: Sticker, name: "Stickers", desc: "Custom cut stickers for branding, packaging, promotions, and more." },
 ];
 
 const STEPS = [
@@ -151,7 +152,7 @@ const s = {
   services: { background: "var(--bg2)", padding: "clamp(44px,8vw,60px) clamp(20px,5vw,32px)" },
   servicesGrid: { maxWidth: 1000, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 16 },
   card: { background: "var(--bg)", borderRadius: "var(--r-lg)", padding: "32px 28px", boxShadow: "var(--shadow)" },
-  cardIcon: { fontSize: 36, marginBottom: 16 },
+  cardIcon: { marginBottom: 16, color: "var(--blue)" },
   cardTitle: { fontSize: 18, fontWeight: 700, marginBottom: 8, letterSpacing: "-0.01em" },
   cardDesc: { fontSize: 14, color: "var(--text2)", lineHeight: 1.65 },
   howSection: { padding: "clamp(56px,10vw,80px) clamp(20px,5vw,32px)" },

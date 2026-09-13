@@ -1,5 +1,6 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import ThemeToggle from "../../ThemeToggle";
+import { Check, Mail } from "lucide-react";
 
 export default function OrderConfirmation() {
   const nav = useNavigate();
@@ -12,7 +13,7 @@ export default function OrderConfirmation() {
     <div style={s.root}>
       <ThemeToggle floating />
       <div style={s.card} className="au">
-        <div style={s.check}>✓</div>
+        <div style={s.check}><Check size={30} strokeWidth={3} /></div>
         <h1 style={s.title}>Order Submitted!</h1>
         <p style={s.sub}>
           Thank you, <strong>{order.customerName}</strong>. We've received your order and will review it shortly.
@@ -38,7 +39,8 @@ export default function OrderConfirmation() {
         </div>
 
         <p style={s.emailNote}>
-          📧 Price quote will be sent to <strong>{order.email}</strong>
+          <Mail size={15} style={{ verticalAlign: "-2px", marginRight: 6 }} />
+          Price quote will be sent to <strong>{order.email}</strong>
         </p>
 
         <button style={s.btn} onClick={() => nav("/")}>Back to Home</button>

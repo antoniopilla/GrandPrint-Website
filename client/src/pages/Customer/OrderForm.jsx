@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { API } from "../../config";
 import ThemeToggle from "../../ThemeToggle";
+import { Check, Upload, Lightbulb, TriangleAlert } from "lucide-react";
 
 const STEPS = ["Your Details", "Order Info", "Review & Submit"];
 
@@ -148,8 +149,11 @@ export default function OrderForm() {
                 ...s.stepLabel,
                 color: i === step ? "var(--text)" : "var(--text3)",
                 fontWeight: i === step ? 700 : 400,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
               }}>
-                {i < step ? "✓ " : ""}{label}
+                {i < step && <Check size={12} strokeWidth={2.5} />}{label}
               </span>
             ))}
           </div>
@@ -239,13 +243,13 @@ export default function OrderForm() {
                     <input type="file" accept=".jpg,.jpeg,.png,.pdf,.ai,.psd,.svg,.eps" onChange={e => setFile(e.target.files[0])} style={{ display: "none" }} />
                     {file ? (
                       <>
-                        <span style={{ fontSize: 24 }}>✓</span>
+                        <Check size={24} style={{ color: "var(--blue)" }} />
                         <span style={{ fontWeight: 600, color: "var(--blue)", fontSize: 14 }}>{file.name}</span>
                         <span style={{ fontSize: 12, color: "var(--text3)" }}>Click to change</span>
                       </>
                     ) : (
                       <>
-                        <span style={{ fontSize: 24, color: "var(--text3)" }}>↑</span>
+                        <Upload size={24} style={{ color: "var(--text3)" }} />
                         <span style={{ fontWeight: 600, fontSize: 14 }}>Click to upload design</span>
                         <span style={{ fontSize: 12, color: "var(--text3)" }}>JPG, PNG, PDF, AI, PSD — max 20MB</span>
                       </>
@@ -285,7 +289,7 @@ export default function OrderForm() {
               </div>
 
               <div style={s.notice}>
-                <span>💡</span>
+                <Lightbulb size={18} style={{ color: "var(--orange)", flexShrink: 0, marginTop: 1 }} />
                 <p style={{ fontSize: 14, lineHeight: 1.7, color: "var(--text2)" }}>
                   Once submitted, our team will review your order and email you a price quote. A <strong>50% downpayment</strong> is needed to start production.
                 </p>
@@ -341,7 +345,7 @@ function Field({ label, name, type = "text", value, onChange, onBlur, placeholde
         }}
       />
       {error && (
-        <span style={s.errorMsg}>⚠ {error}</span>
+        <span style={s.errorMsg}><TriangleAlert size={13} /> {error}</span>
       )}
     </div>
   );
@@ -383,7 +387,7 @@ const s = {
   fieldWrap: { display: "flex", flexDirection: "column", gap: 7 },
   label: { fontSize: 13, fontWeight: 600 },
   input: { background: "var(--bg2)", border: "1.5px solid transparent", borderRadius: "var(--r-sm)", padding: "12px 14px", fontSize: 15, color: "var(--text)", outline: "none", width: "100%", transition: "border-color .15s" },
-  errorMsg: { fontSize: 12, color: "var(--red)", fontWeight: 500, marginTop: 2 },
+  errorMsg: { fontSize: 12, color: "var(--red)", fontWeight: 500, marginTop: 2, display: "inline-flex", alignItems: "center", gap: 4 },
   productGrid: { display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 },
   productBtn: { background: "var(--bg2)", border: "1.5px solid transparent", borderRadius: "var(--r-sm)", padding: "11px 8px", fontSize: 13, fontWeight: 500, color: "var(--text2)", transition: "all .15s" },
   productBtnOn: { background: "var(--blue-light)", border: "1.5px solid var(--blue)", color: "var(--blue)", fontWeight: 700 },

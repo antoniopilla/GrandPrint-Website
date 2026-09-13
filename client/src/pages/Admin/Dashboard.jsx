@@ -4,6 +4,7 @@ import axios from "axios";
 import { API } from "../../config";
 import ThemeToggle from "../../ThemeToggle";
 import { useIsMobile } from "../../useMediaQuery";
+import { TriangleAlert, RefreshCw, Inbox, Printer, CircleCheck, Check } from "lucide-react";
 
 const TABS = [
   { key: "pending",   label: "Pending Approval",   dot: "var(--orange)",  statuses: ["Pending Approval"] },
@@ -133,7 +134,7 @@ export default function AdminDashboard() {
           <div style={s.sideBottom}>
             {totalPending > 0 && (
               <div style={s.alertBox}>
-                <span style={{ fontWeight: 700 }}>⚠ {totalPending} pending</span>
+                <span style={{ fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 6 }}><TriangleAlert size={14} /> {totalPending} pending</span>
                 <span style={{ fontSize: 12, color: "var(--orange)", opacity: 0.8 }}>Needs your approval</span>
               </div>
             )}
@@ -152,7 +153,7 @@ export default function AdminDashboard() {
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <ThemeToggle />
             <button style={s.refreshBtn} onClick={fetchOrders} title="Refresh orders">
-              ↻ Refresh
+              <RefreshCw size={14} /> Refresh
             </button>
           </div>
         </div>
@@ -161,8 +162,8 @@ export default function AdminDashboard() {
           <div style={s.empty}>Loading…</div>
         ) : shown.length === 0 ? (
           <div style={s.empty}>
-            <span style={{ fontSize: 40, display: "block", marginBottom: 12 }}>
-              {tab === "pending" ? "🎉" : tab === "ongoing" ? "🖨️" : "✅"}
+            <span style={{ display: "flex", justifyContent: "center", marginBottom: 12, color: "var(--text3)" }}>
+              {tab === "pending" ? <Inbox size={40} strokeWidth={1.5} /> : tab === "ongoing" ? <Printer size={40} strokeWidth={1.5} /> : <CircleCheck size={40} strokeWidth={1.5} />}
             </span>
             No orders here right now.
           </div>
@@ -235,7 +236,7 @@ export default function AdminDashboard() {
                 onClick={doApprove}
                 disabled={!price || approving}
               >
-                {approving ? "Sending…" : "✓ Approve & Email Client"}
+                {approving ? "Sending…" : (<><Check size={16} /> Approve &amp; Email Client</>)}
               </button>
             </div>
           </div>
@@ -319,7 +320,7 @@ function OrderCard({ order, onApprove, onStatusChange, actionLoading }) {
           )}
           {order.status === "Completed" && (
             <ActionBtn color="var(--green)" bg="var(--green-light)" onClick={() => onStatusChange(order._id, "Fully Paid")} loading={actionLoading}>
-              Confirm Final Payment ✓
+              Confirm Final Payment <Check size={14} />
             </ActionBtn>
           )}
           {order.status === "Fully Paid" && (
@@ -336,7 +337,7 @@ function ActionBtn({ children, color, bg, onClick, loading }) {
     <button
       onClick={onClick}
       disabled={loading}
-      style={{ background: bg, color, border: "none", borderRadius: "var(--r-sm)", padding: "9px 16px", fontSize: 13, fontWeight: 600, fontFamily: "var(--font)", opacity: loading ? 0.6 : 1, transition: "opacity .15s" }}
+      style={{ background: bg, color, border: "none", borderRadius: "var(--r-sm)", padding: "9px 16px", fontSize: 13, fontWeight: 600, fontFamily: "var(--font)", opacity: loading ? 0.6 : 1, transition: "opacity .15s", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}
     >
       {loading ? "…" : children}
     </button>
@@ -360,7 +361,7 @@ const s = {
   header: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28, flexWrap: "wrap", gap: 16 },
   pageTitle: { fontSize: 28, fontWeight: 800, letterSpacing: "-0.025em", marginBottom: 2 },
   pageSub: { fontSize: 13, color: "var(--text2)" },
-  refreshBtn: { background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 980, padding: "8px 16px", fontSize: 13, fontWeight: 500, color: "var(--text2)", cursor: "pointer", fontFamily: "var(--font)" },
+  refreshBtn: { background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 980, padding: "8px 16px", fontSize: 13, fontWeight: 500, color: "var(--text2)", cursor: "pointer", fontFamily: "var(--font)", display: "inline-flex", alignItems: "center", gap: 6 },
   list: { display: "flex", flexDirection: "column", gap: 14 },
   card: { background: "var(--bg)", borderRadius: "var(--r-lg)", boxShadow: "var(--shadow)", padding: "24px 28px" },
   cardTop: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18 },
@@ -391,7 +392,7 @@ const s = {
   bRowTotal: { borderTop: "1px solid var(--border)", paddingTop: 10, marginTop: 4, fontSize: 15, fontWeight: 700, color: "var(--text)" },
   modalBtns: { display: "flex", gap: 10 },
   cancelBtn: { flex: 1, background: "var(--bg2)", border: "none", borderRadius: 980, padding: "12px", fontSize: 14, fontWeight: 600, color: "var(--text2)", cursor: "pointer", fontFamily: "var(--font)" },
-  approveBtn: { flex: 2, background: "var(--blue)", color: "#fff", border: "none", borderRadius: 980, padding: "12px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font)", transition: "opacity .15s" },
+  approveBtn: { flex: 2, background: "var(--blue)", color: "#fff", border: "none", borderRadius: 980, padding: "12px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font)", transition: "opacity .15s", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 },
 
   // ── Responsive (mobile ≤640px): sidebar becomes a top bar ──
   rootMobile: { flexDirection: "column" },
