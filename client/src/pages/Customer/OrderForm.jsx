@@ -332,7 +332,7 @@ const s = {
   progressBar: { height: 3, background: "var(--bg3)" },
   progressFill: { height: "100%", background: "var(--blue)", transition: "width 0.35s ease", borderRadius: 2 },
   wrap: { flex: 1, display: "flex", justifyContent: "center", padding: "40px 20px 60px" },
-  card: { background: "var(--bg)", borderRadius: "var(--r-xl)", boxShadow: "var(--shadow-lg)", padding: "40px 40px 32px", width: "100%", maxWidth: 520 },
+  card: { background: "var(--bg)", borderRadius: "var(--r-xl)", boxShadow: "var(--shadow-lg)", padding: "clamp(24px,5vw,40px) clamp(22px,5vw,40px) clamp(24px,5vw,32px)", width: "100%", maxWidth: 520 },
   stepLabels: { display: "flex", gap: 20, marginBottom: 28, flexWrap: "wrap" },
   stepLabel: { fontSize: 12, transition: "all 0.2s" },
   title: { fontSize: 24, fontWeight: 800, letterSpacing: "-0.02em", marginBottom: 6 },

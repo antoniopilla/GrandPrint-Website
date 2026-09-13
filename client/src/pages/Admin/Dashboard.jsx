@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { API } from "../../config";
 import ThemeToggle from "../../ThemeToggle";
+import { useIsMobile } from "../../useMediaQuery";
 
 const TABS = [
   { key: "pending",   label: "Pending Approval",   dot: "var(--orange)",  statuses: ["Pending Approval"] },
@@ -25,6 +26,7 @@ const authHeaders = () => ({
 
 export default function AdminDashboard() {
   const nav = useNavigate();
+  const isMobile = useIsMobile();
   const [tab, setTab] = useState("pending");
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -94,20 +96,25 @@ export default function AdminDashboard() {
   const totalPending = counts.pending || 0;
 
   return (
-    <div style={s.root}>
+    <div style={{ ...s.root, ...(isMobile ? s.rootMobile : {}) }}>
       {/* ── Sidebar ── */}
-      <aside style={s.sidebar}>
-        <div style={s.sideHead}>
-          <p style={s.sideEye}>Admin Panel</p>
-          <p style={s.sideName}>GrandPrint</p>
+      <aside style={{ ...s.sidebar, ...(isMobile ? s.sidebarMobile : {}) }}>
+        <div style={{ ...s.sideHead, ...(isMobile ? s.sideHeadMobile : {}) }}>
+          <div>
+            <p style={s.sideEye}>Admin Panel</p>
+            <p style={s.sideName}>GrandPrint</p>
+          </div>
+          {isMobile && (
+            <button style={s.logoutBtnTop} onClick={logout}>Sign Out</button>
+          )}
         </div>
 
-        <nav style={s.nav}>
+        <nav style={{ ...s.nav, ...(isMobile ? s.navMobile : {}) }}>
           {TABS.map(t => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              style={{ ...s.navBtn, ...(tab === t.key ? s.navBtnOn : {}) }}
+              style={{ ...s.navBtn, ...(isMobile ? s.navBtnMobile : {}), ...(tab === t.key ? s.navBtnOn : {}) }}
             >
               <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span style={{ width: 7, height: 7, background: t.dot, borderRadius: "50%", flexShrink: 0 }} />
@@ -122,22 +129,24 @@ export default function AdminDashboard() {
           ))}
         </nav>
 
-        <div style={s.sideBottom}>
-          {totalPending > 0 && (
-            <div style={s.alertBox}>
-              <span style={{ fontWeight: 700 }}>⚠ {totalPending} pending</span>
-              <span style={{ fontSize: 12, color: "var(--orange)", opacity: 0.8 }}>Needs your approval</span>
-            </div>
-          )}
-          <button style={s.logoutBtn} onClick={logout}>Sign Out</button>
-        </div>
+        {!isMobile && (
+          <div style={s.sideBottom}>
+            {totalPending > 0 && (
+              <div style={s.alertBox}>
+                <span style={{ fontWeight: 700 }}>⚠ {totalPending} pending</span>
+                <span style={{ fontSize: 12, color: "var(--orange)", opacity: 0.8 }}>Needs your approval</span>
+              </div>
+            )}
+            <button style={s.logoutBtn} onClick={logout}>Sign Out</button>
+          </div>
+        )}
       </aside>
 
       {/* ── Main ── */}
-      <main style={s.main}>
+      <main style={{ ...s.main, ...(isMobile ? s.mainMobile : {}) }}>
         <div style={s.header}>
           <div>
-            <h1 style={s.pageTitle}>{currentTab.label}</h1>
+            <h1 style={{ ...s.pageTitle, ...(isMobile ? s.pageTitleMobile : {}) }}>{currentTab.label}</h1>
             <p style={s.pageSub}>{shown.length} order{shown.length !== 1 ? "s" : ""}</p>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -348,7 +357,7 @@ const s = {
   alertBox: { background: "rgba(255,159,10,0.15)", border: "1px solid rgba(255,159,10,0.3)", borderRadius: "var(--r-sm)", padding: "10px 12px", fontSize: 13, color: "var(--orange)", display: "flex", flexDirection: "column", gap: 2 },
   logoutBtn: { background: "rgba(255,255,255,0.08)", border: "none", borderRadius: "var(--r-sm)", padding: "10px", fontSize: 13, fontWeight: 500, color: "rgba(255,255,255,0.5)", width: "100%", cursor: "pointer", fontFamily: "var(--font)" },
   main: { flex: 1, padding: "40px 40px 60px", overflow: "auto" },
-  header: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28 },
+  header: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28, flexWrap: "wrap", gap: 16 },
   pageTitle: { fontSize: 28, fontWeight: 800, letterSpacing: "-0.025em", marginBottom: 2 },
   pageSub: { fontSize: 13, color: "var(--text2)" },
   refreshBtn: { background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 980, padding: "8px 16px", fontSize: 13, fontWeight: 500, color: "var(--text2)", cursor: "pointer", fontFamily: "var(--font)" },
@@ -383,4 +392,14 @@ const s = {
   modalBtns: { display: "flex", gap: 10 },
   cancelBtn: { flex: 1, background: "var(--bg2)", border: "none", borderRadius: 980, padding: "12px", fontSize: 14, fontWeight: 600, color: "var(--text2)", cursor: "pointer", fontFamily: "var(--font)" },
   approveBtn: { flex: 2, background: "var(--blue)", color: "#fff", border: "none", borderRadius: 980, padding: "12px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font)", transition: "opacity .15s" },
+
+  // ── Responsive (mobile ≤640px): sidebar becomes a top bar ──
+  rootMobile: { flexDirection: "column" },
+  sidebarMobile: { width: "100%", height: "auto", position: "static", flexDirection: "column", padding: "14px 16px 12px", gap: 12 },
+  sideHeadMobile: { marginBottom: 0, padding: 0, display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
+  logoutBtnTop: { background: "rgba(255,255,255,0.12)", border: "none", borderRadius: "var(--r-sm)", padding: "8px 14px", fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.85)", cursor: "pointer", fontFamily: "var(--font)", whiteSpace: "nowrap", flexShrink: 0 },
+  navMobile: { flexDirection: "row", flex: "none", gap: 8, overflowX: "auto", paddingBottom: 2 },
+  navBtnMobile: { flex: "none", width: "auto", whiteSpace: "nowrap", gap: 8, padding: "8px 12px" },
+  mainMobile: { padding: "20px 16px 40px" },
+  pageTitleMobile: { fontSize: 22 },
 };

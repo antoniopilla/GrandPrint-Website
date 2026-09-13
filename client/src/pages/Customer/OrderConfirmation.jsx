@@ -60,7 +60,7 @@ const NEXT = [
 
 const s = {
   root: { minHeight: "100vh", background: "var(--bg2)", display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px" },
-  card: { background: "var(--bg)", borderRadius: "var(--r-xl)", boxShadow: "var(--shadow-lg)", padding: "48px 40px", width: "100%", maxWidth: 480, textAlign: "center" },
+  card: { background: "var(--bg)", borderRadius: "var(--r-xl)", boxShadow: "var(--shadow-lg)", padding: "clamp(32px,7vw,48px) clamp(24px,5vw,40px)", width: "100%", maxWidth: 480, textAlign: "center" },
   check: { width: 60, height: 60, background: "var(--green)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, color: "#fff", fontWeight: 700, margin: "0 auto 24px" },
   title: { fontSize: 28, fontWeight: 800, letterSpacing: "-0.025em", marginBottom: 10 },
   sub: { fontSize: 15, color: "var(--text2)", lineHeight: 1.7, marginBottom: 28 },

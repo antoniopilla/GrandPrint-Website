@@ -196,7 +196,7 @@ const s = {
   brand: { fontWeight: 700, fontSize: 16, letterSpacing: "-0.01em", cursor: "pointer" },
   homeLink: { background: "none", border: "none", fontSize: 14, fontWeight: 500, color: "var(--text2)", padding: "6px 12px", borderRadius: 8 },
   wrap: { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "48px 20px" },
-  card: { background: "var(--bg)", borderRadius: "var(--r-xl)", boxShadow: "var(--shadow-lg)", padding: "44px 40px", width: "100%", maxWidth: 480 },
+  card: { background: "var(--bg)", borderRadius: "var(--r-xl)", boxShadow: "var(--shadow-lg)", padding: "clamp(28px,6vw,44px) clamp(22px,5vw,40px)", width: "100%", maxWidth: 480 },
   eyebrow: { fontSize: 12, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--blue)", marginBottom: 12 },
   title: { fontSize: 26, fontWeight: 800, letterSpacing: "-0.025em", lineHeight: 1.15, marginBottom: 10 },
   sub: { fontSize: 15, color: "var(--text2)", lineHeight: 1.65, marginBottom: 28 },

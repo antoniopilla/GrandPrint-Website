@@ -62,7 +62,7 @@ export default function AdminLogin() {
 
 const s = {
   root: { minHeight: "100vh", background: "var(--bg2)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 },
-  card: { background: "var(--bg)", borderRadius: "var(--r-xl)", boxShadow: "var(--shadow-lg)", padding: "48px 40px", width: "100%", maxWidth: 380, textAlign: "center" },
+  card: { background: "var(--bg)", borderRadius: "var(--r-xl)", boxShadow: "var(--shadow-lg)", padding: "clamp(32px,7vw,48px) clamp(26px,5vw,40px)", width: "100%", maxWidth: 380, textAlign: "center" },
   iconWrap: { fontSize: 36, marginBottom: 20, display: "block" },
   title: { fontSize: 26, fontWeight: 800, letterSpacing: "-0.025em", marginBottom: 8 },
   sub: { fontSize: 14, color: "var(--text2)", marginBottom: 28, lineHeight: 1.5 },
