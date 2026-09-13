@@ -202,11 +202,11 @@ export default function AdminDashboard() {
             <div style={s.priceBox}>
               <span style={s.peso}>₱</span>
               <input
-                type="number"
-                min="1"
+                type="text"
+                inputMode="decimal"
                 placeholder="0"
                 value={price}
-                onChange={e => setPrice(e.target.value)}
+                onChange={e => setPrice(e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1"))}
                 style={s.priceInput}
                 autoFocus
               />

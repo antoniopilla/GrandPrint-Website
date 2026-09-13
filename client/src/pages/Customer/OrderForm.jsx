@@ -23,12 +23,37 @@ const validate = {
   },
   contactNumber: (v) => {
     if (!v.trim()) return "Contact number is required.";
-    // Accept: 09XXXXXXXXX, +639XXXXXXXXX, 09XX-XXX-XXXX, spaces OK
+    // Accept 09XXXXXXXXX or +639XXXXXXXXX
     const digits = v.replace(/[\s\-]/g, "");
     if (!/^(\+63|0)(9\d{9})$/.test(digits))
-      return "Enter a valid PH mobile number (e.g. 09XX-XXX-XXXX).";
+      return "Enter a valid PH mobile number (e.g. 09171234567).";
     return null;
   },
+};
+
+// ── Live input formatters (restrict/normalize as the user types) ──────────────
+// Title Case: strictly one uppercase letter per word, everything else lowercase.
+const formatName = (v) =>
+  v
+    .replace(/[^\p{L}\s'.-]/gu, "")               // letters, spaces, apostrophe, period, hyphen only
+    .replace(/\s{2,}/g, " ")                       // collapse repeated spaces
+    .toLowerCase()
+    .replace(/(^|[\s'.-])\p{L}/gu, (m) => m.toUpperCase());
+
+// Phone: digits only, with an optional leading "+"; capped at +63XXXXXXXXXX length.
+const formatPhone = (v) =>
+  v.replace(/[^\d+]/g, "").replace(/(?!^)\+/g, "").slice(0, 13);
+
+const onlyDigits = (v) => v.replace(/\D/g, "");
+// Decimal: digits and a single dot (for dimensions in feet).
+const formatDecimal = (v) => v.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1");
+
+const FORMATTERS = {
+  customerName: formatName,
+  contactNumber: formatPhone,
+  pieces: onlyDigits,
+  width: formatDecimal,
+  height: formatDecimal,
 };
 
 export default function OrderForm() {
@@ -42,7 +67,11 @@ export default function OrderForm() {
     productType: "", width: "", height: "", pieces: "", notes: "",
   });
 
-  const set = (e) => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
+  const set = (e) => {
+    const { name, value } = e.target;
+    const fmt = FORMATTERS[name];
+    setForm(f => ({ ...f, [name]: fmt ? fmt(value) : value }));
+  };
   const touch = (name) => setTouched(t => ({ ...t, [name]: true }));
 
   // Per-field errors (only shown after blur/touch)
@@ -54,7 +83,12 @@ export default function OrderForm() {
 
   const step0Valid =
     !errors.customerName && !errors.email && !errors.contactNumber;
-  const step1OK = form.productType && form.width && form.height && form.pieces && file;
+  const step1OK =
+    form.productType &&
+    Number(form.width) > 0 &&
+    Number(form.height) > 0 &&
+    Number(form.pieces) > 0 &&
+    file;
 
   // Touch all step-0 fields to show errors on attempted Continue
   const attemptStep0 = () => {
@@ -143,10 +177,12 @@ export default function OrderForm() {
                 <Field
                   label="Contact Number"
                   name="contactNumber"
+                  type="tel"
+                  inputMode="tel"
                   value={form.contactNumber}
                   onChange={set}
                   onBlur={() => touch("contactNumber")}
-                  placeholder="09XX-XXX-XXXX"
+                  placeholder="09171234567"
                   error={touched.contactNumber ? errors.contactNumber : null}
                 />
               </div>
@@ -183,13 +219,13 @@ export default function OrderForm() {
                 <div style={s.fieldWrap}>
                   <label style={s.label}>Dimensions <span style={{ color: "var(--text3)", fontWeight: 400 }}>(in feet)</span></label>
                   <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                    <input name="width" type="number" min="1" placeholder="Width" value={form.width} onChange={set} style={s.input} />
+                    <input name="width" type="text" inputMode="decimal" placeholder="Width" value={form.width} onChange={set} style={s.input} />
                     <span style={{ color: "var(--text3)", fontSize: 18, flexShrink: 0 }}>×</span>
-                    <input name="height" type="number" min="1" placeholder="Height" value={form.height} onChange={set} style={s.input} />
+                    <input name="height" type="text" inputMode="decimal" placeholder="Height" value={form.height} onChange={set} style={s.input} />
                   </div>
                 </div>
 
-                <Field label="Number of Pieces" name="pieces" type="number" min="1" value={form.pieces} onChange={set} placeholder="1" />
+                <Field label="Number of Pieces" name="pieces" type="text" inputMode="numeric" value={form.pieces} onChange={set} placeholder="1" />
 
                 {/* File upload */}
                 <div style={s.fieldWrap}>
@@ -281,13 +317,14 @@ export default function OrderForm() {
   );
 }
 
-function Field({ label, name, type = "text", value, onChange, onBlur, placeholder, min, error }) {
+function Field({ label, name, type = "text", value, onChange, onBlur, placeholder, min, error, inputMode }) {
   return (
     <div style={s.fieldWrap}>
       <label style={s.label}>{label}</label>
       <input
         name={name}
         type={type}
+        inputMode={inputMode}
         value={value}
         onChange={onChange}
         onBlur={onBlur}

@@ -107,7 +107,7 @@ export default function SendPayment() {
                   style={s.input}
                   placeholder="e.g. GP-123456"
                   value={orderId}
-                  onChange={(e) => setOrderId(e.target.value)}
+                  onChange={(e) => setOrderId(e.target.value.toUpperCase().replace(/\s/g, ""))}
                   onKeyDown={(e) => e.key === "Enter" && fetchOrder()}
                 />
                 <button
