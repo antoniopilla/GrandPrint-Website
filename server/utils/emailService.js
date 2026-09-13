@@ -57,7 +57,7 @@ const sendApprovalEmail = async (order) => {
 
     <!-- FB instructions -->
     <p style="font-size:16px;line-height:1.8;color:#1d1d1f;margin:0 0 16px;">
-      After sending your payment, please message us on our <a href="${process.env.FB_PAGE}" style="color:#0071e3;text-decoration:none;font-weight:600;">Facebook page</a> and send your receipt along with this message format:
+      After sending your payment, please upload the receipt to the website or message us on our <a href="${process.env.FB_PAGE}" style="color:#0071e3;text-decoration:none;font-weight:600;">Facebook page</a> along with this message format:
     </p>
 
     <div style="background:#fff8e7;border-left:4px solid #ff9f0a;border-radius:0 10px 10px 0;padding:18px 20px;margin-bottom:28px;font-family:'Courier New',monospace;font-size:14px;line-height:2;color:#1d1d1f;">
