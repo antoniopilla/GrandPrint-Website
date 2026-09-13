@@ -32,13 +32,18 @@ const validate = {
 };
 
 // ── Live input formatters (restrict/normalize as the user types) ──────────────
-// Title Case: strictly one uppercase letter per word, everything else lowercase.
-const formatName = (v) =>
-  v
+// Generational suffixes (II–VIII) that should stay all-caps when they end a name.
+const ROMAN_SUFFIX = /(\s)(viii|vii|iii|vi|iv|ii|v)(\.?)$/i;
+// Title Case: strictly one uppercase letter per word, everything else lowercase,
+// but keep a trailing Roman-numeral suffix uppercase (e.g. "Antonio Pilla III").
+const formatName = (v) => {
+  const titled = v
     .replace(/[^\p{L}\s'.-]/gu, "")               // letters, spaces, apostrophe, period, hyphen only
     .replace(/\s{2,}/g, " ")                       // collapse repeated spaces
     .toLowerCase()
     .replace(/(^|[\s'.-])\p{L}/gu, (m) => m.toUpperCase());
+  return titled.replace(ROMAN_SUFFIX, (_, sp, num, dot) => sp + num.toUpperCase() + dot);
+};
 
 // Phone: digits only, with an optional leading "+"; capped at +63XXXXXXXXXX length.
 const formatPhone = (v) =>
