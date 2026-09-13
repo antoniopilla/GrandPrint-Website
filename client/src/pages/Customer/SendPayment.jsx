@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import { API } from "../../config";
 import ThemeToggle from "../../ThemeToggle";
-import { Check } from "lucide-react";
+import { Check, Upload } from "lucide-react";
 
 const peso = (n) =>
   `₱${Number(n || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}`;
@@ -161,7 +161,7 @@ export default function SendPayment() {
                           style={{ display: "none" }}
                         />
                         <span style={s.fileBtn}>
-                          {file ? (<><Check size={15} style={{ verticalAlign: "-3px", marginRight: 6 }} />{file.name}</>) : "Choose receipt image"}
+                          {file ? (<><Check size={15} style={{ verticalAlign: "-3px", marginRight: 6 }} />{file.name}</>) : (<><Upload size={15} style={{ verticalAlign: "-3px", marginRight: 6 }} />Upload receipt</>)}
                         </span>
                       </label>
 
@@ -214,8 +214,8 @@ const s = {
   bRow: { display: "flex", justifyContent: "space-between", fontSize: 14, color: "var(--text2)" },
   bRowHi: { borderTop: "1px solid var(--border)", paddingTop: 10, marginTop: 2, fontWeight: 700, color: "var(--text)" },
   payArea: { display: "flex", flexDirection: "column", gap: 12 },
-  fileLabel: { display: "block" },
-  fileBtn: { display: "block", background: "var(--bg)", border: "1px dashed var(--border)", borderRadius: "var(--r-sm)", padding: "14px 16px", fontSize: 14, fontWeight: 500, color: "var(--text2)", textAlign: "center", wordBreak: "break-all" },
+  fileLabel: { display: "block", cursor: "pointer" },
+  fileBtn: { display: "block", background: "var(--bg)", border: "1px dashed var(--border)", borderRadius: "var(--r-sm)", padding: "14px 16px", fontSize: 14, fontWeight: 500, color: "var(--text2)", textAlign: "center", wordBreak: "break-all", cursor: "pointer" },
   primaryBtn: { background: "var(--blue)", color: "#fff", border: "none", borderRadius: 980, padding: "14px", fontSize: 15, fontWeight: 600, width: "100%", transition: "opacity .15s" },
   statusNote: { fontSize: 14, color: "var(--text2)", lineHeight: 1.6, background: "var(--bg)", borderRadius: "var(--r-sm)", padding: "14px 16px" },
   doneBox: { textAlign: "center" },
