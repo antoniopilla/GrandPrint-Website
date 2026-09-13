@@ -1,17 +1,7 @@
-const nodemailer = require("nodemailer");
 require("dotenv").config();
 
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    // trim guards against stray whitespace pasted into the env var
-    pass: (process.env.EMAIL_PASS || "").trim(),
-  },
-  connectionTimeout: 10000, // fail fast instead of hanging if SMTP is unreachable
-  greetingTimeout: 10000,
-  socketTimeout: 15000,
-});
+// Render blocks outbound SMTP, so we send via Brevo's HTTPS API instead of Gmail SMTP.
+const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
 
 const sendApprovalEmail = async (order) => {
   const total = Number(order.price);
@@ -90,12 +80,31 @@ const sendApprovalEmail = async (order) => {
 </body>
 </html>`;
 
-  await transporter.sendMail({
-    from: `"${process.env.BUSINESS_NAME || "GrandPrint"}" <${process.env.EMAIL_USER}>`,
-    to: order.email,
-    subject: `Your Order ${order.orderId} is Approved — ₱${totalFmt}`,
-    html,
+  const apiKey = process.env.BREVO_API_KEY;
+  if (!apiKey) throw new Error("BREVO_API_KEY is not set");
+
+  const res = await fetch(BREVO_API_URL, {
+    method: "POST",
+    headers: {
+      "api-key": apiKey,
+      "content-type": "application/json",
+      accept: "application/json",
+    },
+    body: JSON.stringify({
+      sender: {
+        name: process.env.BUSINESS_NAME || "GrandPrint",
+        email: process.env.EMAIL_USER, // must be a verified sender in Brevo
+      },
+      to: [{ email: order.email, name: order.customerName }],
+      subject: `Your Order ${order.orderId} is Approved — ₱${totalFmt}`,
+      htmlContent: html,
+    }),
   });
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`Brevo API ${res.status}: ${detail}`);
+  }
 
   console.log(`Email sent → ${order.email} for ${order.orderId}`);
 };
