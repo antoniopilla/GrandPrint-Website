@@ -82,19 +82,7 @@ export default function Home() {
         <div style={s.bannerInner}>
           <h2 style={s.bannerTitle}>Ready to print?</h2>
           <p style={s.bannerSub}>It only takes a few minutes to place your order.</p>
-          <div style={s.bannerBtns}>
-            <Btn primary large onClick={() => nav("/order")}>Get Started →</Btn>
-            <a
-              href="https://www.messenger.com/t/61551691632716"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={s.msgBtn}
-              onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.2)"; e.currentTarget.style.transform = "scale(1.03)"; }}
-              onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.12)"; e.currentTarget.style.transform = "scale(1)"; }}
-            >
-              <MessageCircle size={19} /> Chat on Messenger
-            </a>
-          </div>
+          <Btn primary large onClick={() => nav("/order")}>Get Started →</Btn>
         </div>
       </section>
 
@@ -102,6 +90,20 @@ export default function Home() {
       <footer style={s.footer}>
         <p>© {new Date().getFullYear()} GrandPrint · All rights reserved</p>
       </footer>
+
+      {/* Floating chat button — stays visible while scrolling */}
+      <a
+        href="https://www.messenger.com/t/61551691632716"
+        target="_blank"
+        rel="noopener noreferrer"
+        style={s.fab}
+        title="Chat on Messenger"
+        aria-label="Chat on Messenger"
+        onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.05)"; e.currentTarget.style.background = "var(--blue-hover)"; }}
+        onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.background = "var(--blue)"; }}
+      >
+        <MessageCircle size={20} /> Chat with us
+      </a>
     </div>
   );
 }
@@ -180,7 +182,6 @@ const s = {
   bannerInner: { maxWidth: 500, margin: "0 auto" },
   bannerTitle: { fontSize: "clamp(28px,4vw,40px)", fontWeight: 800, color: "#fff", letterSpacing: "-0.025em", marginBottom: 12 },
   bannerSub: { fontSize: 16, color: "rgba(255,255,255,0.6)", marginBottom: 32 },
-  bannerBtns: { display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" },
-  msgBtn: { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 10, background: "rgba(255,255,255,0.12)", color: "#fff", border: "1px solid rgba(255,255,255,0.25)", borderRadius: 980, padding: "16px 32px", fontSize: 17, fontWeight: 600, textDecoration: "none", fontFamily: "var(--font)", transition: "all 0.18s", cursor: "pointer" },
+  fab: { position: "fixed", bottom: 24, right: 24, zIndex: 1000, display: "inline-flex", alignItems: "center", gap: 10, background: "var(--blue)", color: "#fff", borderRadius: 980, padding: "14px 22px", fontSize: 15, fontWeight: 600, boxShadow: "0 6px 20px rgba(0,0,0,0.25)", textDecoration: "none", fontFamily: "var(--font)", transition: "all 0.18s", cursor: "pointer" },
   footer: { padding: "24px clamp(20px,5vw,32px)", textAlign: "center", fontSize: 13, color: "var(--text3)", borderTop: "1px solid var(--border)" },
 };
