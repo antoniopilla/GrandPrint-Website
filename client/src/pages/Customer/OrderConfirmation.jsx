@@ -1,4 +1,4 @@
-import { useNavigate, useLocation } from "react-router-dom";
+import { Navigate, useNavigate, useLocation } from "react-router-dom";
 import ThemeToggle from "../../ThemeToggle";
 import { Check, Mail } from "lucide-react";
 import { createPaymentPath } from "../../paymentAccess";
@@ -8,7 +8,7 @@ export default function OrderConfirmation() {
   const { state } = useLocation();
   const order = state?.order;
 
-  if (!order) { nav("/"); return null; }
+  if (!order) return <Navigate to="/" replace />;
 
   return (
     <div style={s.root}>
@@ -31,7 +31,7 @@ export default function OrderConfirmation() {
           {NEXT.map((n, i) => (
             <div key={i} style={s.timelineRow}>
               <div style={s.dot} />
-              <div>
+              <div style={{ minWidth: 0 }}>
                 <p style={s.nHead}>{n.head}</p>
                 <p style={s.nBody}>{!order.accessToken && n.legacyBody ? n.legacyBody : n.body}</p>
               </div>
@@ -65,13 +65,13 @@ const NEXT = [
 
 const s = {
   root: { minHeight: "100vh", background: "var(--bg2)", display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px" },
-  card: { background: "var(--bg)", borderRadius: "var(--r-xl)", boxShadow: "var(--shadow-lg)", padding: "clamp(32px,7vw,48px) clamp(24px,5vw,40px)", width: "100%", maxWidth: 480, textAlign: "center" },
+  card: { minWidth: 0, overflowWrap: "anywhere", background: "var(--bg)", borderRadius: "var(--r-xl)", boxShadow: "var(--shadow-lg)", padding: "clamp(32px,7vw,48px) clamp(24px,5vw,40px)", width: "100%", maxWidth: 480, textAlign: "center" },
   check: { width: 60, height: 60, background: "var(--green)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, color: "#fff", fontWeight: 700, margin: "0 auto 24px" },
   title: { fontSize: 28, fontWeight: 800, letterSpacing: "-0.025em", marginBottom: 10 },
   sub: { fontSize: 15, color: "var(--text2)", lineHeight: 1.7, marginBottom: 28 },
   idBox: { background: "var(--bg2)", borderRadius: "var(--r)", padding: "20px", marginBottom: 28, display: "flex", flexDirection: "column", gap: 4 },
   idLabel: { fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--text3)" },
-  id: { fontSize: 26, fontWeight: 800, letterSpacing: "0.04em", color: "var(--blue)" },
+  id: { minWidth: 0, overflowWrap: "anywhere", fontSize: "clamp(20px,6vw,26px)", fontWeight: 800, letterSpacing: "0.04em", color: "var(--blue)" },
   idNote: { fontSize: 12, color: "var(--text3)" },
   timeline: { textAlign: "left", marginBottom: 20 },
   timelineTitle: { fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--text3)", marginBottom: 14 },

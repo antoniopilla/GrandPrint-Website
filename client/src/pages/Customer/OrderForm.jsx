@@ -248,12 +248,13 @@ export default function OrderForm() {
               <div style={s.fields}>
                 {/* Product picker */}
                 <div style={s.fieldWrap}>
-                  <label style={s.label}>Product Type</label>
-                  <div style={s.productGrid}>
+                  <span id="order-productType-label" style={s.label}>Product Type</span>
+                  <div role="group" aria-labelledby="order-productType-label" aria-describedby={touched.productType && errors.productType ? "order-productType-error" : undefined} style={s.productGrid}>
                     {PRODUCT_TYPES.map(p => (
                       <button
                         key={p}
                         type="button"
+                        aria-pressed={form.productType === p}
                         onClick={() => setForm(f => ({ ...f, productType: p }))}
                         style={{
                           ...s.productBtn,
@@ -264,50 +265,51 @@ export default function OrderForm() {
                       </button>
                     ))}
                   </div>
-                  {touched.productType && errors.productType && <span style={s.errorMsg}>{errors.productType}</span>}
+                  {touched.productType && errors.productType && <span id="order-productType-error" style={s.errorMsg}>{errors.productType}</span>}
                 </div>
 
                 {/* Dimensions */}
                 <div style={s.fieldWrap}>
-                  <label style={s.label}>Dimensions <span style={{ color: "var(--text3)", fontWeight: 400 }}>(in feet)</span></label>
-                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                    <input name="width" type="text" inputMode="decimal" placeholder="Width" value={form.width} onChange={set} onBlur={() => touch("width")} style={{ ...s.input, borderColor: touched.width && errors.width ? "var(--red)" : "transparent" }} />
+                  <span id="order-dimensions-label" style={s.label}>Dimensions <span style={{ color: "var(--text3)", fontWeight: 400 }}>(in feet)</span></span>
+                  <div role="group" aria-labelledby="order-dimensions-label" style={{ display: "flex", gap: 10, alignItems: "center", minWidth: 0 }}>
+                    <label className="sr-only" htmlFor="order-width">Width (in feet)</label>
+                    <input id="order-width" name="width" type="text" inputMode="decimal" placeholder="Width" value={form.width} onChange={set} onBlur={() => touch("width")} aria-invalid={!!(touched.width && errors.width)} aria-describedby={touched.width && errors.width ? "order-width-error" : undefined} style={{ ...s.input, borderColor: touched.width && errors.width ? "var(--red)" : "transparent" }} />
                     <span style={{ color: "var(--text3)", fontSize: 18, flexShrink: 0 }}>×</span>
-                    <input name="height" type="text" inputMode="decimal" placeholder="Height" value={form.height} onChange={set} onBlur={() => touch("height")} style={{ ...s.input, borderColor: touched.height && errors.height ? "var(--red)" : "transparent" }} />
+                    <label className="sr-only" htmlFor="order-height">Height (in feet)</label>
+                    <input id="order-height" name="height" type="text" inputMode="decimal" placeholder="Height" value={form.height} onChange={set} onBlur={() => touch("height")} aria-invalid={!!(touched.height && errors.height)} aria-describedby={touched.height && errors.height ? "order-height-error" : undefined} style={{ ...s.input, borderColor: touched.height && errors.height ? "var(--red)" : "transparent" }} />
                   </div>
-                  {((touched.width && errors.width) || (touched.height && errors.height)) && (
-                    <span style={s.errorMsg}>{(touched.width && errors.width) || errors.height}</span>
-                  )}
+                  {touched.width && errors.width && <span id="order-width-error" style={s.errorMsg}>{errors.width}</span>}
+                  {touched.height && errors.height && <span id="order-height-error" style={s.errorMsg}>{errors.height}</span>}
                 </div>
 
                 <Field label="Number of Pieces" name="pieces" type="text" inputMode="numeric" value={form.pieces} onChange={set} onBlur={() => touch("pieces")} placeholder="1" error={touched.pieces ? errors.pieces : null} />
 
                 {/* File upload */}
                 <div style={s.fieldWrap}>
-                  <label style={s.label}>Design File</label>
-                  <label style={{ ...s.uploadBox, ...(file ? s.uploadBoxDone : {}) }}>
-                    <input ref={fileInput} type="file" accept=".pdf,.png,.jpg,.jpeg,.psd,.ai,.eps" onChange={pickFile} style={{ display: "none" }} />
+                  <label htmlFor="order-designFile" style={s.label}>Design File</label>
+                  <input id="order-designFile" ref={fileInput} type="file" accept=".pdf,.png,.jpg,.jpeg,.psd,.ai,.eps" onChange={pickFile} hidden aria-describedby={uploadError ? "order-designFile-hint order-upload-error" : "order-designFile-hint"} />
+                  <button type="button" onClick={() => fileInput.current?.click()} aria-describedby={uploadError ? "order-designFile-hint order-upload-error" : "order-designFile-hint"} style={{ ...s.uploadBox, ...(file ? s.uploadBoxDone : {}) }}>
                     {file ? (
                       <>
                         <Check size={24} style={{ color: "var(--blue)" }} />
-                        <span style={{ fontWeight: 600, color: "var(--blue)", fontSize: 14 }}>{file.name}</span>
+                        <span style={{ fontWeight: 600, color: "var(--blue)", fontSize: 14, maxWidth: "100%", overflowWrap: "anywhere" }}>{file.name}</span>
                         <span style={{ fontSize: 12, color: "var(--text3)" }}>Click to change</span>
                       </>
                     ) : (
                       <>
                         <Upload size={24} style={{ color: "var(--text3)" }} />
                         <span style={{ fontWeight: 600, fontSize: 14 }}>Click to upload design</span>
-                        <span style={{ fontSize: 12, color: "var(--text3)" }}>PDF, PNG, JPG/JPEG, PSD, AI, EPS — max 10 MB</span>
                       </>
                     )}
-                  </label>
+                    <span id="order-designFile-hint" className={file ? "sr-only" : undefined} style={{ fontSize: 12, color: "var(--text3)" }}>PDF, PNG, JPG/JPEG, PSD, AI, EPS — max 10 MB</span>
+                  </button>
                 </div>
 
                 {/* Notes */}
                 <div style={s.fieldWrap}>
-                  <label style={s.label}>Notes <span style={{ color: "var(--text3)", fontWeight: 400 }}>(optional)</span></label>
-                  <textarea name="notes" value={form.notes} onChange={set} onBlur={() => touch("notes")} placeholder="Special instructions, color preferences, finishing details..." rows={3} style={{ ...s.input, resize: "vertical", lineHeight: 1.6 }} />
-                  {touched.notes && errors.notes && <span style={s.errorMsg}>{errors.notes}</span>}
+                  <label htmlFor="order-notes" style={s.label}>Notes <span style={{ color: "var(--text3)", fontWeight: 400 }}>(optional)</span></label>
+                  <textarea id="order-notes" name="notes" value={form.notes} onChange={set} onBlur={() => touch("notes")} aria-invalid={!!(touched.notes && errors.notes)} aria-describedby={touched.notes && errors.notes ? "order-notes-error" : undefined} placeholder="Special instructions, color preferences, finishing details..." rows={3} style={{ ...s.input, resize: "vertical", lineHeight: 1.6 }} />
+                  {touched.notes && errors.notes && <span id="order-notes-error" style={s.errorMsg}>{errors.notes}</span>}
                 </div>
               </div>
             </div>
@@ -345,7 +347,7 @@ export default function OrderForm() {
           )}
 
           {uploadError && (
-            <div role="alert" style={{ ...s.errorMsg, display: "block", lineHeight: 1.5 }}>
+            <div id="order-upload-error" role="alert" style={{ ...s.errorMsg, display: "block", lineHeight: 1.5 }}>
               <p>{uploadError}</p>
               <a href={MESSENGER_URL} target="_blank" rel="noopener noreferrer" style={s.contactLink}>
                 Chat with GrandPrint on Messenger
@@ -383,10 +385,12 @@ export default function OrderForm() {
 }
 
 function Field({ label, name, type = "text", value, onChange, onBlur, placeholder, min, error, inputMode }) {
+  const id = `order-${name}`;
   return (
     <div style={s.fieldWrap}>
-      <label style={s.label}>{label}</label>
+      <label htmlFor={id} style={s.label}>{label}</label>
       <input
+        id={id}
         name={name}
         type={type}
         inputMode={inputMode}
@@ -395,13 +399,15 @@ function Field({ label, name, type = "text", value, onChange, onBlur, placeholde
         onBlur={onBlur}
         placeholder={placeholder}
         min={min}
+        aria-invalid={!!error}
+        aria-describedby={error ? `${id}-error` : undefined}
         style={{
           ...s.input,
           borderColor: error ? "var(--red)" : "transparent",
         }}
       />
       {error && (
-        <span style={s.errorMsg}><TriangleAlert size={13} /> {error}</span>
+        <span id={`${id}-error`} style={s.errorMsg}><TriangleAlert size={13} /> {error}</span>
       )}
     </div>
   );
@@ -418,37 +424,37 @@ function Section({ label, children }) {
 
 function Row({ l, v }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+    <div style={{ display: "flex", justifyContent: "space-between", gap: 16, minWidth: 0 }}>
       <span style={{ fontSize: 14, color: "var(--text2)" }}>{l}</span>
-      <span style={{ fontSize: 14, fontWeight: 500, textAlign: "right", wordBreak: "break-word", maxWidth: "60%" }}>{v}</span>
+      <span style={{ fontSize: 14, fontWeight: 500, textAlign: "right", overflowWrap: "anywhere", minWidth: 0, maxWidth: "60%" }}>{v}</span>
     </div>
   );
 }
 
 const s = {
   root: { minHeight: "100vh", background: "var(--bg2)", display: "flex", flexDirection: "column" },
-  nav: { background: "var(--bg)", borderBottom: "1px solid var(--border)", padding: "0 24px", height: 56, display: "flex", alignItems: "center", justifyContent: "space-between" },
+  nav: { background: "var(--bg)", borderBottom: "1px solid var(--border)", padding: "12px 24px", minHeight: 56, display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between" },
   back: { background: "none", border: "none", fontSize: 14, fontWeight: 500, color: "var(--blue)", padding: "6px 0" },
   navTitle: { fontWeight: 700, fontSize: 15 },
   navStep: { fontSize: 13, color: "var(--text3)", fontWeight: 500 },
   progressBar: { height: 3, background: "var(--bg3)" },
   progressFill: { height: "100%", background: "var(--blue)", transition: "width 0.35s ease", borderRadius: 2 },
-  wrap: { flex: 1, display: "flex", justifyContent: "center", padding: "40px 20px 60px" },
-  card: { background: "var(--bg)", borderRadius: "var(--r-xl)", boxShadow: "var(--shadow-lg)", padding: "clamp(24px,5vw,40px) clamp(22px,5vw,40px) clamp(24px,5vw,32px)", width: "100%", maxWidth: 520 },
+  wrap: { flex: 1, minWidth: 0, display: "flex", justifyContent: "center", padding: "40px 20px 60px" },
+  card: { background: "var(--bg)", borderRadius: "var(--r-xl)", boxShadow: "var(--shadow-lg)", padding: "clamp(24px,5vw,40px) clamp(22px,5vw,40px) clamp(24px,5vw,32px)", width: "100%", minWidth: 0, maxWidth: 520, overflowWrap: "anywhere" },
   stepLabels: { display: "flex", gap: 20, marginBottom: 28, flexWrap: "wrap" },
   stepLabel: { fontSize: 12, transition: "all 0.2s" },
   title: { fontSize: 24, fontWeight: 800, letterSpacing: "-0.02em", marginBottom: 6 },
   subtitle: { fontSize: 14, color: "var(--text2)", marginBottom: 28, lineHeight: 1.5 },
   fields: { display: "flex", flexDirection: "column", gap: 18 },
-  fieldWrap: { display: "flex", flexDirection: "column", gap: 7 },
+  fieldWrap: { display: "flex", flexDirection: "column", minWidth: 0, gap: 7 },
   label: { fontSize: 13, fontWeight: 600 },
-  input: { background: "var(--bg2)", border: "1.5px solid transparent", borderRadius: "var(--r-sm)", padding: "12px 14px", fontSize: 15, color: "var(--text)", outline: "none", width: "100%", transition: "border-color .15s" },
+  input: { background: "var(--bg2)", border: "1.5px solid transparent", borderRadius: "var(--r-sm)", padding: "12px 14px", fontSize: 15, color: "var(--text)", outline: "none", width: "100%", minWidth: 0, transition: "border-color .15s" },
   errorMsg: { fontSize: 12, color: "var(--red)", fontWeight: 500, marginTop: 2, display: "inline-flex", alignItems: "center", gap: 4 },
   contactLink: { display: "inline-block", marginTop: 8, color: "var(--blue)", fontWeight: 600 },
-  productGrid: { display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 },
-  productBtn: { background: "var(--bg2)", border: "1.5px solid transparent", borderRadius: "var(--r-sm)", padding: "11px 8px", fontSize: 13, fontWeight: 500, color: "var(--text2)", transition: "all .15s" },
+  productGrid: { display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 8 },
+  productBtn: { background: "var(--bg2)", border: "1.5px solid transparent", borderRadius: "var(--r-sm)", padding: "11px 8px", fontSize: 13, fontWeight: 500, color: "var(--text2)", minWidth: 0, overflowWrap: "anywhere", transition: "all .15s" },
   productBtnOn: { background: "var(--blue-light)", border: "1.5px solid var(--blue)", color: "var(--blue)", fontWeight: 700 },
-  uploadBox: { display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: "28px", background: "var(--bg2)", border: "2px dashed var(--border)", borderRadius: "var(--r)", cursor: "pointer", textAlign: "center" },
+  uploadBox: { display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: "28px", background: "var(--bg2)", border: "2px dashed var(--border)", borderRadius: "var(--r)", cursor: "pointer", textAlign: "center", width: "100%", minWidth: 0, color: "var(--text)", overflowWrap: "anywhere" },
   uploadBoxDone: { background: "var(--blue-light)", border: "2px dashed var(--blue)" },
   reviewBox: { background: "var(--bg2)", borderRadius: "var(--r)", padding: "22px", marginBottom: 20 },
   divider: { height: 1, background: "var(--border)", margin: "16px 0" },

@@ -11,7 +11,7 @@ export default function Home() {
       <nav style={s.nav}>
         <div style={s.navInner}>
           <span style={s.brand}>GrandPrint</span>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", minWidth: 0 }}>
             <button style={s.adminLink} onClick={() => nav("/pay")}>
               Pay Order
             </button>
@@ -110,7 +110,7 @@ export default function Home() {
 
 function Btn({ children, primary, large, onClick }) {
   const base = {
-    display: "inline-flex", alignItems: "center", justifyContent: "center",
+    display: "inline-flex", alignItems: "center", justifyContent: "center", maxWidth: "100%", minWidth: 0, overflowWrap: "anywhere",
     border: "none", borderRadius: 980, fontWeight: 600, cursor: "pointer",
     transition: "all 0.18s", fontFamily: "var(--font)",
     padding: large ? "16px 40px" : "13px 28px",
@@ -154,7 +154,7 @@ const STEPS = [
 const s = {
   page: { minHeight: "100vh", display: "flex", flexDirection: "column", background: "var(--bg)" },
   nav: { borderBottom: "1px solid var(--border)", background: "var(--nav-bg)", backdropFilter: "blur(20px)", position: "sticky", top: 0, zIndex: 100 },
-  navInner: { maxWidth: 1000, margin: "0 auto", padding: "0 clamp(16px,5vw,32px)", height: 56, display: "flex", alignItems: "center", justifyContent: "space-between" },
+  navInner: { maxWidth: 1000, margin: "0 auto", padding: "8px clamp(16px,5vw,32px)", minHeight: 56, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, minWidth: 0 },
   brand: { fontWeight: 700, fontSize: 16, letterSpacing: "-0.01em" },
   adminLink: { background: "none", border: "none", fontSize: 14, fontWeight: 500, color: "var(--text2)", padding: "6px 12px", borderRadius: 8, transition: "color .15s" },
   hero: { padding: "clamp(56px,11vw,100px) clamp(20px,5vw,32px) clamp(56px,9vw,80px)", textAlign: "center" },
@@ -164,7 +164,7 @@ const s = {
   sub: { fontSize: 19, color: "var(--text2)", lineHeight: 1.6, maxWidth: 420, margin: "0 auto 36px", animationDelay: "0.12s" },
   ctas: { display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", animationDelay: "0.18s" },
   services: { background: "var(--bg2)", padding: "clamp(44px,8vw,60px) clamp(20px,5vw,32px)" },
-  servicesGrid: { maxWidth: 1000, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 16 },
+  servicesGrid: { maxWidth: 1000, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(260px,100%),1fr))", gap: 16, minWidth: 0 },
   card: { background: "var(--bg)", borderRadius: "var(--r-lg)", padding: "32px 28px", boxShadow: "var(--shadow)" },
   cardIcon: { marginBottom: 16, color: "var(--blue)" },
   cardTitle: { fontSize: 18, fontWeight: 700, marginBottom: 8, letterSpacing: "-0.01em" },

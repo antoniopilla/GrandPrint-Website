@@ -18,82 +18,105 @@ export default function SendPayment() {
   const { orderId: paramOrderId } = useParams();
   const location = useLocation();
 
-  const [accessToken, setAccessToken] = useState("");
-  const [file, setFile] = useState(null);
+  const [retryVersion, setRetryVersion] = useState(0);
+  const contextKey = JSON.stringify([paramOrderId || "", location.hash, retryVersion]);
+  const [lookup, setLookup] = useState(null);
+  const [selection, setSelection] = useState(null);
   const fileInput = useRef(null);
-  const [order, setOrder] = useState(null);
-  const [invalidLink, setInvalidLink] = useState(false);
-  const [lookupError, setLookupError] = useState("");
-  const [looking, setLooking] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState("");
-  const [submitted, setSubmitted] = useState(false);
+  const lookupSequence = useRef(0);
+  const submission = useRef(null);
+  const [submitAttempt, setSubmitAttempt] = useState(null);
+  const [receiptError, setReceiptError] = useState(null);
+  const context = lookup?.key === contextKey ? lookup : null;
+  const order = context?.order || null;
+  const accessToken = context?.token || "";
+  const file = selection?.key === contextKey ? selection.file : null;
+  const looking = !context || context.status === "loading";
+  const invalidLink = context?.status === "invalid";
+  const lookupError = context?.error || "";
+  const submitting = submitAttempt?.key === contextKey;
+  const submitError = receiptError?.key === contextKey ? receiptError.message : "";
+  const submitted = context?.submitted || false;
 
   useEffect(() => {
     let active = true;
-    setOrder(null);
-    setFile(null);
-    setSubmitted(false);
-    setInvalidLink(false);
-    setLookupError("");
-    setSubmitError("");
+    const sequence = ++lookupSequence.current;
+    submission.current = null;
+    setSelection(null);
+    if (fileInput.current) fileInput.current.value = "";
+    setSubmitAttempt(null);
+    setReceiptError(null);
     const { token, hasFragmentToken } = capturePaymentToken(paramOrderId, location.hash);
     if (hasFragmentToken) {
       window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
     }
-    setAccessToken(token);
+    const cleanup = () => {
+      active = false;
+      if (lookupSequence.current === sequence) lookupSequence.current += 1;
+    };
     if (!paramOrderId || !token) {
-      setInvalidLink(true);
-      setLooking(false);
-      return () => { active = false; };
+      setLookup({ key: contextKey, status: "invalid" });
+      return cleanup;
     }
 
-    setLooking(true);
+    setLookup({ key: contextKey, status: "loading", token });
     axios.get(`${API}/api/orders/lookup/${encodeURIComponent(paramOrderId)}`, {
       headers: { "X-Order-Access-Token": token },
     }).then((res) => {
-      if (active) setOrder(res.data);
+      if (!active || lookupSequence.current !== sequence) return;
+      if (res.data?.orderId !== paramOrderId) {
+        setLookup({ key: contextKey, status: "error", token, error: "Unable to load your payment link. Please try again later." });
+        return;
+      }
+      setLookup({ key: contextKey, status: "ready", token, order: res.data });
     }).catch((err) => {
-      if (!active) return;
+      if (!active || lookupSequence.current !== sequence) return;
       if (err.response?.status === 404 || err.response?.status === 401 || err.response?.status === 403) {
         forgetPaymentToken(paramOrderId);
-        setAccessToken("");
-        setInvalidLink(true);
+        setLookup({ key: contextKey, status: "invalid" });
       } else {
-        setLookupError("Unable to load your payment link. Please try again later.");
+        setLookup({ key: contextKey, status: "error", token, error: "Unable to load your payment link. Please try again later." });
       }
-    }).finally(() => {
-      if (active) setLooking(false);
     });
-    return () => { active = false; };
-  }, [paramOrderId, location.hash]);
+    return cleanup;
+  }, [paramOrderId, location.hash, contextKey]);
 
   const rejectOversizeFile = () => {
-    setFile(null);
+    setSelection(null);
     if (fileInput.current) fileInput.current.value = "";
-    setSubmitError(FILE_SIZE_MESSAGE);
+    setReceiptError({ key: contextKey, message: FILE_SIZE_MESSAGE });
   };
 
   const pickFile = (e) => {
-    setSubmitError("");
+    if (!order || !accessToken || looking || submitting || order.status !== "Awaiting Downpayment") {
+      e.target.value = "";
+      return;
+    }
+    setReceiptError(null);
     const pickedFile = e.target.files[0] || null;
     if (pickedFile?.size > MAX_UPLOAD_BYTES) {
       e.target.value = "";
       rejectOversizeFile();
       return;
     }
-    setFile(pickedFile);
+    setSelection({ key: contextKey, file: pickedFile });
   };
 
   const submitPayment = async () => {
-    if (!order || !accessToken || looking) return;
-    if (!file) return alert("Please upload your payment receipt first.");
+    if (!order || order.orderId !== paramOrderId || order.status !== "Awaiting Downpayment" || !accessToken || looking || submission.current?.key === contextKey) return;
+    if (!file) {
+      setReceiptError({ key: contextKey, message: "Please upload your payment receipt first." });
+      return;
+    }
     if (file.size > MAX_UPLOAD_BYTES) {
       rejectOversizeFile();
       return;
     }
-    setSubmitting(true);
-    setSubmitError("");
+    const attempt = { key: contextKey, sequence: lookupSequence.current };
+    submission.current = attempt;
+    setSubmitAttempt(attempt);
+    setReceiptError(null);
+    const isCurrentAttempt = () => submission.current === attempt && lookupSequence.current === attempt.sequence;
     const formData = new FormData();
     formData.append("paymentProof", file);
 
@@ -101,19 +124,23 @@ export default function SendPayment() {
       await axios.patch(`${API}/api/customers/pay/${encodeURIComponent(order.orderId)}`, formData, {
         headers: { "Content-Type": "multipart/form-data", "X-Order-Access-Token": accessToken },
       });
-      setSubmitted(true);
+      if (!isCurrentAttempt()) return;
+      setLookup((current) => current?.key === contextKey ? { ...current, submitted: true } : current);
     } catch (err) {
+      if (!isCurrentAttempt()) return;
       if (err.response?.status === 404 || err.response?.status === 401 || err.response?.status === 403) {
         forgetPaymentToken(order.orderId);
-        setAccessToken("");
-        setOrder(null);
-        setFile(null);
-        setInvalidLink(true);
+        setLookup({ key: contextKey, status: "invalid" });
+        setSelection(null);
+        if (fileInput.current) fileInput.current.value = "";
       } else {
-        setSubmitError(getUploadErrorMessage(err, getApiErrorMessage(err, "Failed to submit payment. Please try again.")));
+        setReceiptError({ key: contextKey, message: getUploadErrorMessage(err, getApiErrorMessage(err, "Failed to submit payment. Please try again.")) });
       }
     } finally {
-      setSubmitting(false);
+      if (isCurrentAttempt()) {
+        submission.current = null;
+        setSubmitAttempt(null);
+      }
     }
   };
 
@@ -124,7 +151,7 @@ export default function SendPayment() {
       {/* Nav */}
       <nav style={s.nav}>
         <div style={s.navInner}>
-          <span style={s.brand} onClick={() => nav("/")}>GrandPrint</span>
+          <button type="button" style={s.brand} onClick={() => nav("/")}>GrandPrint</button>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <button style={s.homeLink} onClick={() => nav("/")}>Home</button>
             <ThemeToggle />
@@ -154,7 +181,7 @@ export default function SendPayment() {
                 screenshot of your GCash or BPI payment.
               </p>
 
-              {looking && <p style={s.statusNote}>Checking payment link…</p>}
+              {looking && <p role="status" style={s.statusNote}>Checking payment link…</p>}
               {invalidLink && (
                 <div style={s.statusNote}>
                   <p>{INVALID_LINK}</p>
@@ -163,12 +190,17 @@ export default function SendPayment() {
                   </a>
                 </div>
               )}
-              {lookupError && <p style={s.errorNote}>{lookupError}</p>}
+              {lookupError && (
+                <div style={s.errorNote}>
+                  <p role="alert">{lookupError}</p>
+                  <button type="button" style={s.retryBtn} onClick={() => setRetryVersion((version) => version + 1)}>Retry</button>
+                </div>
+              )}
 
               {order && (
                 <div style={s.orderBox}>
                   <div style={s.orderHead}>
-                    <div>
+                    <div style={{ minWidth: 0 }}>
                       <p style={s.orderName}>Order details</p>
                       <p style={s.orderMeta}>
                         {order.productType}
@@ -194,19 +226,31 @@ export default function SendPayment() {
 
                   {order.status === "Awaiting Downpayment" ? (
                     <div style={s.payArea}>
-                      <label style={s.fileLabel}>
+                      <div style={s.fileLabel}>
+                        <label htmlFor="payment-receipt" className="sr-only">Payment receipt</label>
                         <input
+                          id="payment-receipt"
                           ref={fileInput}
                           type="file"
                           accept=".jpg,.jpeg,.png,.pdf"
                           onChange={pickFile}
-                          style={{ display: "none" }}
+                          disabled={submitting || looking}
+                          aria-describedby={`receipt-hint${submitError ? " receipt-error" : ""}`}
+                          aria-invalid={!!submitError}
+                          hidden
                         />
-                        <span style={s.fileBtn}>
-                          {file ? (<><Check size={15} style={{ verticalAlign: "-3px", marginRight: 6 }} />{file.name}</>) : (<><Upload size={15} style={{ verticalAlign: "-3px", marginRight: 6 }} />Upload receipt</>)}
-                        </span>
-                        <span style={{ fontSize: 12, color: "var(--text3)" }}>JPG/JPEG, PNG, PDF — max 10 MB</span>
-                      </label>
+                        <button
+                          type="button"
+                          style={s.fileBtn}
+                          onClick={() => fileInput.current?.click()}
+                          disabled={submitting || looking}
+                          aria-label={file ? `Change receipt: ${file.name}` : "Upload receipt"}
+                          aria-describedby={`receipt-hint${submitError ? " receipt-error" : ""}`}
+                        >
+                          {file ? (<><Check aria-hidden="true" size={15} style={{ verticalAlign: "-3px", marginRight: 6 }} />{file.name}</>) : (<><Upload aria-hidden="true" size={15} style={{ verticalAlign: "-3px", marginRight: 6 }} />Upload receipt</>)}
+                        </button>
+                        <span id="receipt-hint" style={{ fontSize: 12, color: "var(--text3)" }}>JPG/JPEG, PNG, PDF — max 10 MB</span>
+                      </div>
 
                       <button
                         style={{ ...s.primaryBtn, opacity: submitting || looking || !file ? 0.5 : 1 }}
@@ -216,7 +260,7 @@ export default function SendPayment() {
                         {submitting ? "Submitting…" : "Submit Payment"}
                       </button>
                       {submitError && (
-                        <div role="alert" style={s.errorNote}>
+                        <div id="receipt-error" role="alert" style={s.errorNote}>
                           <p>{submitError}</p>
                           <a href={CONTACT_URL} target="_blank" rel="noopener noreferrer" style={s.contactLink}>
                             Chat with GrandPrint on Messenger
@@ -241,29 +285,30 @@ export default function SendPayment() {
 }
 
 const s = {
-  root: { minHeight: "100vh", background: "var(--bg2)", display: "flex", flexDirection: "column" },
+  root: { minHeight: "100vh", minWidth: 0, background: "var(--bg2)", display: "flex", flexDirection: "column" },
   nav: { borderBottom: "1px solid var(--border)", background: "var(--nav-bg)", backdropFilter: "blur(20px)", position: "sticky", top: 0, zIndex: 100 },
-  navInner: { maxWidth: 1000, margin: "0 auto", padding: "0 32px", height: 56, display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" },
-  brand: { fontWeight: 700, fontSize: 16, letterSpacing: "-0.01em", cursor: "pointer" },
+  navInner: { maxWidth: 1000, minWidth: 0, margin: "0 auto", padding: "0 clamp(12px,5vw,32px)", height: 56, display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" },
+  brand: { background: "none", border: "none", padding: 0, color: "var(--text)", fontWeight: 700, fontSize: 16, letterSpacing: "-0.01em", cursor: "pointer" },
   homeLink: { background: "none", border: "none", fontSize: 14, fontWeight: 500, color: "var(--text2)", padding: "6px 12px", borderRadius: 8 },
   wrap: { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "48px 20px" },
-  card: { background: "var(--bg)", borderRadius: "var(--r-xl)", boxShadow: "var(--shadow-lg)", padding: "clamp(28px,6vw,44px) clamp(22px,5vw,40px)", width: "100%", maxWidth: 480 },
+  card: { minWidth: 0, overflowWrap: "anywhere", background: "var(--bg)", borderRadius: "var(--r-xl)", boxShadow: "var(--shadow-lg)", padding: "clamp(28px,6vw,44px) clamp(22px,5vw,40px)", width: "100%", maxWidth: 480 },
   eyebrow: { fontSize: 12, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--blue)", marginBottom: 12 },
   title: { fontSize: 26, fontWeight: 800, letterSpacing: "-0.025em", lineHeight: 1.15, marginBottom: 10 },
   sub: { fontSize: 15, color: "var(--text2)", lineHeight: 1.65, marginBottom: 28 },
   contactLink: { display: "inline-block", marginTop: 12, color: "var(--blue)", fontWeight: 600 },
   errorNote: { color: "var(--red)", fontSize: 13, marginTop: 12, lineHeight: 1.5 },
-  orderBox: { marginTop: 24, background: "var(--bg2)", borderRadius: "var(--r)", padding: "22px" },
-  orderHead: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 16 },
+  orderBox: { minWidth: 0, marginTop: 24, background: "var(--bg2)", borderRadius: "var(--r)", padding: "clamp(14px,4vw,22px)" },
+  orderHead: { minWidth: 0, display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 16 },
   orderName: { fontSize: 16, fontWeight: 700, letterSpacing: "-0.01em", marginBottom: 3 },
   orderMeta: { fontSize: 13, color: "var(--text2)" },
-  orderIdBadge: { fontSize: 11, fontWeight: 700, color: "var(--blue)", letterSpacing: "0.06em", whiteSpace: "nowrap" },
+  orderIdBadge: { minWidth: 0, overflowWrap: "anywhere", fontSize: 11, fontWeight: 700, color: "var(--blue)", letterSpacing: "0.06em" },
   breakdown: { background: "var(--bg)", borderRadius: "var(--r-sm)", padding: "14px 16px", marginBottom: 18, display: "flex", flexDirection: "column", gap: 8 },
-  bRow: { display: "flex", justifyContent: "space-between", fontSize: 14, color: "var(--text2)" },
+  bRow: { minWidth: 0, display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "space-between", fontSize: 14, color: "var(--text2)" },
   bRowHi: { borderTop: "1px solid var(--border)", paddingTop: 10, marginTop: 2, fontWeight: 700, color: "var(--text)" },
   payArea: { display: "flex", flexDirection: "column", gap: 12 },
   fileLabel: { display: "block", cursor: "pointer" },
-  fileBtn: { display: "block", background: "var(--bg)", border: "1px dashed var(--border)", borderRadius: "var(--r-sm)", padding: "14px 16px", fontSize: 14, fontWeight: 500, color: "var(--text2)", textAlign: "center", wordBreak: "break-all", cursor: "pointer" },
+  fileBtn: { display: "block", width: "100%", minWidth: 0, background: "var(--bg)", border: "1px dashed var(--border)", borderRadius: "var(--r-sm)", padding: "14px 16px", fontSize: 14, fontWeight: 500, color: "var(--text2)", textAlign: "center", overflowWrap: "anywhere", cursor: "pointer" },
+  retryBtn: { background: "var(--bg)", color: "var(--blue)", border: "1px solid var(--border)", borderRadius: "var(--r-sm)", padding: "8px 16px", marginTop: 10, fontSize: 14, fontWeight: 600 },
   primaryBtn: { background: "var(--blue)", color: "#fff", border: "none", borderRadius: 980, padding: "14px", fontSize: 15, fontWeight: 600, width: "100%", transition: "opacity .15s" },
   statusNote: { fontSize: 14, color: "var(--text2)", lineHeight: 1.6, background: "var(--bg)", borderRadius: "var(--r-sm)", padding: "14px 16px" },
   doneBox: { textAlign: "center" },

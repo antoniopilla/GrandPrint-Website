@@ -158,6 +158,42 @@ Before deploying these configuration and session changes:
 
 Rollback restores the previous API fallback, admin-session handling and login behavior. Leave rate-limit flags disabled while investigating. No stored orders or fields need changing.
 
+### Frontend reliability, accessibility and lint
+
+Payment lookup and receipt state are bound to the current private link and lookup sequence. Changing the link or retrying clears the selected receipt, including the native picker; stale lookup and upload responses cannot update the new link. Payment submission stays unavailable during lookup. Network/server failures retain the access token and offer Retry, while 401/403/404 keep the same invalid-or-outdated-link screen and Messenger contact. Confirmation without navigation state uses a replacement redirect to Home.
+
+The Dashboard shows an explicit load error and Retry rather than an empty list after a failed lookup. Existing loaded orders remain visible with the warning. Admin login distinguishes connection/server outages from incorrect passwords and throttling. Upload controls use keyboard-operable buttons; form labels, hints and errors are programmatically linked. Keyboard focus is visible. The approval dialog traps focus, closes with Escape and restores focus to its trigger, or Refresh if approval removes that card. Long customer details, IDs, filenames and action labels wrap, and flex/grid containers can shrink on narrow screens.
+
+Computed light-theme contrast ratios use the stylesheet's sRGB values and account for alpha compositing on the dark sidebar:
+
+| Text / background | Ratio |
+|---|---:|
+| Secondary text / darkest neutral surface | 5.09:1 |
+| Muted text / darkest neutral surface | 4.86:1 |
+| Blue / blue status background | 4.92:1 |
+| Green / green status background | 4.93:1 |
+| Orange / orange status background | 5.24:1 |
+| Purple / purple status background | 5.58:1 |
+| Red / darkest neutral surface | 4.63:1 |
+| Sidebar warning / composited warning background | 7.76:1 |
+| Sidebar warning at 80% opacity / warning background | 5.59:1 |
+
+These calculated pairs exceed 4.5:1. They do not establish browser rendering or full accessibility conformance. Dark-theme colors are outside this light-theme contrast fix.
+
+The previously undeclared lint devDependencies are now pinned: `eslint` 10.0.0, `@eslint/js` 10.0.1, `globals` 15.15.0, `eslint-plugin-react-hooks` 7.1.1 and `eslint-plugin-react-refresh` 0.4.20. `npm run lint` runs `eslint .` without fixing or caching. The config retains the traditional Hooks rules and recognizes the Vite compile-time flag and Node-based Tailwind config; it does not enable React Compiler rules. Existing lint errors remain in `src/ThemeToggle.jsx:23` (unused catch binding and empty catch) and `src/pages/Customer/OrderForm.jsx:41` (unnecessary regex escape). They were reported rather than changed as unrelated cleanup.
+
+The new lint tooling requires Node 20.x at least 20.19.0, Node 22.x at least 22.13.0, or Node 24+. Local mocks, JSX checks, lint execution and the production build used Node 22.14.0. The production build ran in memory with a synthetic API URL and environment-file loading disabled; no build output was written.
+
+Owner checks before/after the frontend deployment:
+
+1. Open **Vercel → frontend project → Settings → Build and Deployment → Node.js Version**. Confirm a supported version; 22.x matches the locally tested major and 24.x is also supported. The selection applies to future deployments. Send only the selected version if reporting back. See [Vercel Node.js settings](https://vercel.com/docs/functions/runtimes/node-js/node-js-versions).
+2. This batch deploys only the frontend. It adds no environment variables, server changes or data migration. Keep the existing IP-limit flags disabled until the separate proxy confirmation and enablement approval. Rollback restores the previous frontend; stored orders and private access tokens need no changes.
+3. In the browser, open **Home → Place an Order**, use Tab through the fields, and continue to Order Info after entering valid details. Focus the upload button, press Enter and cancel the native picker. Open an existing private payment link locally in your own browser and repeat the receipt-picker check without submitting. This verifies native keyboard behavior; Codex did not use a real browser or create an order.
+4. In **Admin → Sign In → Pending Approval → Approve & Set Price**, check initial price focus, Tab/Shift+Tab containment, Escape and restored focus; cancel without approving. To check outages in Chrome/Edge, press **F12 → Network → throttling dropdown → Offline**, then use Dashboard Refresh or Sign In. For payment lookup, open your private link, click Home, switch to Offline, and use browser Back to return to the payment page; it should show the outage message and Retry. Restore **No throttling**, then retry and confirm recovery. No production records need changing for these checks.
+5. For narrow screens in Chrome/Edge, press **F12 → Toggle device toolbar** (or **Ctrl+Shift+M**), select Responsive and test widths 320 and 375. Check the Home navigation, order form, payment/confirmation IDs, Dashboard cards and approval dialog for sideways page scrolling. Native keyboard interaction, screen-reader behavior and responsive rendering remain Not verified until the owner checks them.
+
+Report pass/fail and safe error text only. Redact passwords, session/access tokens, private-link fragments, customer names/emails/contact details, and full IP addresses. These owner checks can be skipped without blocking local implementation, but skipped cases remain Not verified.
+
 ---
 
 ## Tech Stack
