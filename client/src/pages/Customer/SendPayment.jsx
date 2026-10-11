@@ -1,12 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import axios from "axios";
 import { API } from "../../config";
 import ThemeToggle from "../../ThemeToggle";
 import { Check, Upload } from "lucide-react";
 import { capturePaymentToken, forgetPaymentToken } from "../../paymentAccess";
+import { MAX_UPLOAD_BYTES, FILE_SIZE_MESSAGE, MESSENGER_URL as CONTACT_URL, getUploadErrorMessage } from "../../uploadLimits";
 
-const CONTACT_URL = "https://www.messenger.com/t/61551691632716";
 const INVALID_LINK = "This payment link is invalid or outdated. Please contact GrandPrint";
 
 const peso = (n) =>
@@ -19,6 +19,7 @@ export default function SendPayment() {
 
   const [accessToken, setAccessToken] = useState("");
   const [file, setFile] = useState(null);
+  const fileInput = useRef(null);
   const [order, setOrder] = useState(null);
   const [invalidLink, setInvalidLink] = useState(false);
   const [lookupError, setLookupError] = useState("");
@@ -66,9 +67,30 @@ export default function SendPayment() {
     return () => { active = false; };
   }, [paramOrderId, location.hash]);
 
+  const rejectOversizeFile = () => {
+    setFile(null);
+    if (fileInput.current) fileInput.current.value = "";
+    setSubmitError(FILE_SIZE_MESSAGE);
+  };
+
+  const pickFile = (e) => {
+    setSubmitError("");
+    const pickedFile = e.target.files[0] || null;
+    if (pickedFile?.size > MAX_UPLOAD_BYTES) {
+      e.target.value = "";
+      rejectOversizeFile();
+      return;
+    }
+    setFile(pickedFile);
+  };
+
   const submitPayment = async () => {
     if (!order || !accessToken || looking) return;
     if (!file) return alert("Please upload your payment receipt first.");
+    if (file.size > MAX_UPLOAD_BYTES) {
+      rejectOversizeFile();
+      return;
+    }
     setSubmitting(true);
     setSubmitError("");
     const formData = new FormData();
@@ -87,9 +109,7 @@ export default function SendPayment() {
         setFile(null);
         setInvalidLink(true);
       } else {
-        setSubmitError(
-          err.response?.data?.message || "Failed to submit payment. Please try again."
-        );
+        setSubmitError(getUploadErrorMessage(err, "Failed to submit payment. Please try again."));
       }
     } finally {
       setSubmitting(false);
@@ -175,15 +195,16 @@ export default function SendPayment() {
                     <div style={s.payArea}>
                       <label style={s.fileLabel}>
                         <input
+                          ref={fileInput}
                           type="file"
                           accept=".jpg,.jpeg,.png,.pdf"
-                          onChange={(e) => setFile(e.target.files[0])}
+                          onChange={pickFile}
                           style={{ display: "none" }}
                         />
                         <span style={s.fileBtn}>
                           {file ? (<><Check size={15} style={{ verticalAlign: "-3px", marginRight: 6 }} />{file.name}</>) : (<><Upload size={15} style={{ verticalAlign: "-3px", marginRight: 6 }} />Upload receipt</>)}
                         </span>
-                        <span style={{ fontSize: 12, color: "var(--text3)" }}>JPG/JPEG, PNG, PDF — max 20MB</span>
+                        <span style={{ fontSize: 12, color: "var(--text3)" }}>JPG/JPEG, PNG, PDF — max 10 MB</span>
                       </label>
 
                       <button
@@ -193,7 +214,14 @@ export default function SendPayment() {
                       >
                         {submitting ? "Submitting…" : "Submit Payment"}
                       </button>
-                      {submitError && <p style={s.errorNote}>{submitError}</p>}
+                      {submitError && (
+                        <div role="alert" style={s.errorNote}>
+                          <p>{submitError}</p>
+                          <a href={CONTACT_URL} target="_blank" rel="noopener noreferrer" style={s.contactLink}>
+                            Chat with GrandPrint on Messenger
+                          </a>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div style={s.statusNote}>

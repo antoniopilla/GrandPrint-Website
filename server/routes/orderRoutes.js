@@ -19,7 +19,7 @@ const upload = createValidatedUpload({
   fieldName: "designFile",
   kind: "design",
   limits: {
-    fileSize: 20 * 1024 * 1024,
+    fileSize: 10_000_000,
     files: 1,
     fields: 8,
     parts: 10,

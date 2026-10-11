@@ -1,5 +1,10 @@
 const multer = require("multer");
 const { extname } = require("node:path");
+const { getImageDimensions } = require("../utils/imageDimensions");
+
+const CONTACT_URL = "https://www.messenger.com/t/61551691632716";
+const FILE_SIZE_MESSAGE = "File too large. Max 10 MB. Please message us on Messenger for larger files.";
+const PIXEL_SIZE_MESSAGE = "Image is too large (max 25 megapixels). Please message us on Messenger for large artwork.";
 
 const formats = {
   pdf: { mimeTypes: ["application/pdf"], signatures: [Buffer.from("%PDF")] },
@@ -46,6 +51,9 @@ const createValidatedUpload = ({ fieldName, kind, limits }) => {
   return (req, res, next) => {
     upload(req, res, (err) => {
       if (err) {
+        if (err.code === "LIMIT_FILE_SIZE") {
+          return res.status(400).json({ message: FILE_SIZE_MESSAGE, contactUrl: CONTACT_URL });
+        }
         if (err.code === "INVALID_UPLOAD_FORMAT") {
           return res.status(400).json({ message: policy.message });
         }
@@ -58,6 +66,14 @@ const createValidatedUpload = ({ fieldName, kind, limits }) => {
           buffer.length >= signature.length && buffer.subarray(0, signature.length).equals(signature)
         )) {
           return res.status(400).json({ message: policy.message });
+        }
+        const extension = extname(req.file.originalname || "").slice(1).toLowerCase();
+        if (["png", "jpg", "jpeg", "psd"].includes(extension)) {
+          const dimensions = getImageDimensions(buffer, extension);
+          if (!dimensions) return res.status(400).json({ message: policy.message });
+          if (dimensions.width > 25_000_000 / dimensions.height) {
+            return res.status(400).json({ message: PIXEL_SIZE_MESSAGE, contactUrl: CONTACT_URL });
+          }
         }
       }
       next();

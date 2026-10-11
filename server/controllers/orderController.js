@@ -40,8 +40,16 @@ exports.createOrder = async (req, res) => {
 
     let designFile = null;
     if (req.file) {
-      const result = await uploadBuffer(req.file.buffer, "grandprint/designs");
-      designFile = result.secure_url;
+      try {
+        const result = await uploadBuffer(req.file.buffer, "grandprint/designs");
+        designFile = result.secure_url;
+      } catch (uploadError) {
+        console.error("Design upload failed:", uploadError);
+        return res.status(422).json({
+          message: "We could not accept this file. Please try another file or message us on Messenger.",
+          contactUrl: "https://www.messenger.com/t/61551691632716",
+        });
+      }
     }
 
     const order = new Order({

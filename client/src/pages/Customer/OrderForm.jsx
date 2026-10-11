@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { API } from "../../config";
 import ThemeToggle from "../../ThemeToggle";
 import { Check, Upload, Lightbulb, TriangleAlert } from "lucide-react";
+import { MAX_UPLOAD_BYTES, FILE_SIZE_MESSAGE, MESSENGER_URL, getUploadErrorMessage } from "../../uploadLimits";
 
 const STEPS = ["Your Details", "Order Info", "Review & Submit"];
 
@@ -67,6 +68,8 @@ export default function OrderForm() {
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [file, setFile] = useState(null);
+  const [uploadError, setUploadError] = useState("");
+  const fileInput = useRef(null);
   const [touched, setTouched] = useState({});
   const [form, setForm] = useState({
     customerName: "", email: "", contactNumber: "",
@@ -102,7 +105,30 @@ export default function OrderForm() {
     if (step0Valid) setStep(s => s + 1);
   };
 
+  const rejectOversizeFile = () => {
+    setFile(null);
+    if (fileInput.current) fileInput.current.value = "";
+    setUploadError(FILE_SIZE_MESSAGE);
+  };
+
+  const pickFile = (e) => {
+    setUploadError("");
+    const pickedFile = e.target.files[0] || null;
+    if (pickedFile?.size > MAX_UPLOAD_BYTES) {
+      e.target.value = "";
+      rejectOversizeFile();
+      return;
+    }
+    setFile(pickedFile);
+  };
+
   const submit = async () => {
+    if (file?.size > MAX_UPLOAD_BYTES) {
+      rejectOversizeFile();
+      setStep(1);
+      return;
+    }
+    setUploadError("");
     setSubmitting(true);
     try {
       const fd = new FormData();
@@ -113,8 +139,7 @@ export default function OrderForm() {
       });
       nav("/order/done", { state: { order: res.data } });
     } catch (err) {
-      console.error(err);
-      alert("Something went wrong. Please check your connection and try again.");
+      setUploadError(getUploadErrorMessage(err, "Something went wrong. Please check your connection and try again."));
     } finally {
       setSubmitting(false);
     }
@@ -240,7 +265,7 @@ export default function OrderForm() {
                 <div style={s.fieldWrap}>
                   <label style={s.label}>Design File</label>
                   <label style={{ ...s.uploadBox, ...(file ? s.uploadBoxDone : {}) }}>
-                    <input type="file" accept=".pdf,.png,.jpg,.jpeg,.psd,.ai,.eps" onChange={e => setFile(e.target.files[0])} style={{ display: "none" }} />
+                    <input ref={fileInput} type="file" accept=".pdf,.png,.jpg,.jpeg,.psd,.ai,.eps" onChange={pickFile} style={{ display: "none" }} />
                     {file ? (
                       <>
                         <Check size={24} style={{ color: "var(--blue)" }} />
@@ -251,7 +276,7 @@ export default function OrderForm() {
                       <>
                         <Upload size={24} style={{ color: "var(--text3)" }} />
                         <span style={{ fontWeight: 600, fontSize: 14 }}>Click to upload design</span>
-                        <span style={{ fontSize: 12, color: "var(--text3)" }}>PDF, PNG, JPG/JPEG, PSD, AI, EPS — max 20MB</span>
+                        <span style={{ fontSize: 12, color: "var(--text3)" }}>PDF, PNG, JPG/JPEG, PSD, AI, EPS — max 10 MB</span>
                       </>
                     )}
                   </label>
@@ -294,6 +319,15 @@ export default function OrderForm() {
                   Once submitted, our team will review your order and email you a price quote. A <strong>50% downpayment</strong> is needed to start production.
                 </p>
               </div>
+            </div>
+          )}
+
+          {uploadError && (
+            <div role="alert" style={{ ...s.errorMsg, display: "block", lineHeight: 1.5 }}>
+              <p>{uploadError}</p>
+              <a href={MESSENGER_URL} target="_blank" rel="noopener noreferrer" style={s.contactLink}>
+                Chat with GrandPrint on Messenger
+              </a>
             </div>
           )}
 
@@ -388,6 +422,7 @@ const s = {
   label: { fontSize: 13, fontWeight: 600 },
   input: { background: "var(--bg2)", border: "1.5px solid transparent", borderRadius: "var(--r-sm)", padding: "12px 14px", fontSize: 15, color: "var(--text)", outline: "none", width: "100%", transition: "border-color .15s" },
   errorMsg: { fontSize: 12, color: "var(--red)", fontWeight: 500, marginTop: 2, display: "inline-flex", alignItems: "center", gap: 4 },
+  contactLink: { display: "inline-block", marginTop: 8, color: "var(--blue)", fontWeight: 600 },
   productGrid: { display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 },
   productBtn: { background: "var(--bg2)", border: "1.5px solid transparent", borderRadius: "var(--r-sm)", padding: "11px 8px", fontSize: 13, fontWeight: 500, color: "var(--text2)", transition: "all .15s" },
   productBtnOn: { background: "var(--blue-light)", border: "1.5px solid var(--blue)", color: "var(--blue)", fontWeight: 700 },

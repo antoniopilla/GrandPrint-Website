@@ -11,7 +11,7 @@ const upload = createValidatedUpload({
   fieldName: "paymentProof",
   kind: "receipt",
   limits: {
-    fileSize: 20 * 1024 * 1024,
+    fileSize: 10_000_000,
     files: 1,
     fields: 0,
     parts: 2,
@@ -32,7 +32,16 @@ router.patch("/pay/:orderId", paymentRateLimit, requireOrderAccess, upload, asyn
       });
     }
 
-    const result = await uploadBuffer(req.file.buffer, "grandprint/payments");
+    let result;
+    try {
+      result = await uploadBuffer(req.file.buffer, "grandprint/payments");
+    } catch (uploadError) {
+      console.error("Payment proof upload failed:", uploadError);
+      return res.status(422).json({
+        message: "We could not accept this file. Please try another file or message us on Messenger.",
+        contactUrl: "https://www.messenger.com/t/61551691632716",
+      });
+    }
     const updatedOrder = await Order.findOneAndUpdate(
       { _id: order._id, accessToken: order.accessToken },
       { $set: { paymentProof: result.secure_url, status: "Payment Submitted" } },
