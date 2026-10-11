@@ -21,4 +21,28 @@ const uploadBuffer = (buffer, folder) =>
     stream.end(buffer);
   });
 
-module.exports = { cloudinary, uploadBuffer };
+const deleteUploadedAsset = async (result) => {
+  if (
+    typeof result?.public_id !== "string" || !result.public_id.trim() ||
+    !["image", "raw", "video"].includes(result.resource_type) ||
+    (result.type != null && (typeof result.type !== "string" || !result.type.trim()))
+  ) {
+    console.error("Uploaded asset cleanup failed: missing or invalid upload metadata.");
+    return false;
+  }
+
+  try {
+    const deleted = await cloudinary.uploader.destroy(result.public_id, {
+      resource_type: result.resource_type,
+      type: result.type || "upload",
+      invalidate: true,
+    });
+    if (deleted?.result === "ok" || deleted?.result === "not found") return true;
+  } catch {
+    // Cleanup must not replace the response for the original failed operation.
+  }
+  console.error("Uploaded asset cleanup failed.");
+  return false;
+};
+
+module.exports = { cloudinary, uploadBuffer, deleteUploadedAsset };

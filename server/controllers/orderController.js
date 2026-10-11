@@ -1,5 +1,6 @@
+const crypto = require("crypto");
 const Order = require("../models/Order");
-const { uploadBuffer } = require("../config/cloudinary");
+const { uploadBuffer, deleteUploadedAsset } = require("../config/cloudinary");
 const { generateAccessToken } = require("../utils/orderAccess");
 const { buildPaymentLink } = require("../config/customerPortal");
 const { validateEmailSettings } = require("../utils/emailService");
@@ -36,38 +37,29 @@ const provisionAccessToken = async (id) => {
   return provisioned || Order.findById(id).select("+accessToken");
 };
 
-const generateOrderId = async () => {
-  let id, exists = true;
-  while (exists) {
-    id = "GP-" + Math.floor(100000 + Math.random() * 900000);
-    exists = await Order.exists({ orderId: id });
-  }
-  return id;
+const generateOrderId = () => "GP-" + crypto.randomBytes(8).toString("hex").toUpperCase();
+const isOrderIdCollision = (error) => {
+  const pattern = error?.keyPattern || error?.errorResponse?.keyPattern;
+  return error?.code === 11000 && !error.writeConcernError && !error.errorResponse?.writeConcernError &&
+    pattern && Object.keys(pattern).length === 1 &&
+    Object.prototype.hasOwnProperty.call(pattern, "orderId");
 };
+const isRejectedWrite = (error) => !error?.writeConcernError && !error?.errorResponse?.writeConcernError && (
+  ["ValidationError", "CastError"].includes(error?.name) || error?.code === 11000
+);
 
 // POST /api/orders
 exports.createOrder = async (req, res) => {
+  let uploadedAsset;
+  let saveAttempted = false;
+  let orderSaved = false;
   try {
     const { values, errors } = validateOrderInput(req.body);
     if (Object.keys(errors).length) return sendValidationErrors(res, errors);
     const { customerName, email, contactNumber, productType, width, height, pieces, notes } = values;
 
-    let designFile = null;
-    if (req.file) {
-      try {
-        const result = await uploadBuffer(req.file.buffer, "grandprint/designs");
-        designFile = result.secure_url;
-      } catch (uploadError) {
-        console.error("Design upload failed:", uploadError);
-        return res.status(422).json({
-          message: "We could not accept this file. Please try another file or message us on Messenger.",
-          contactUrl: "https://www.messenger.com/t/61551691632716",
-        });
-      }
-    }
-
     const order = new Order({
-      orderId: await generateOrderId(),
+      orderId: generateOrderId(),
       accessToken: generateAccessToken(),
       customerName,
       email,
@@ -77,12 +69,41 @@ exports.createOrder = async (req, res) => {
       height,
       pieces,
       notes,
-      designFile,
+      designFile: null,
     });
 
-    await order.save();
+    await order.validate();
+    if (req.file) {
+      try {
+        uploadedAsset = await uploadBuffer(req.file.buffer, "grandprint/designs");
+        order.designFile = uploadedAsset.secure_url;
+      } catch (uploadError) {
+        console.error("Design upload failed:", uploadError);
+        if (uploadedAsset) await deleteUploadedAsset(uploadedAsset);
+        return res.status(422).json({
+          message: "We could not accept this file. Please try another file or message us on Messenger.",
+          contactUrl: "https://www.messenger.com/t/61551691632716",
+        });
+      }
+    }
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      try {
+        saveAttempted = true;
+        await order.save();
+        orderSaved = true;
+        break;
+      } catch (error) {
+        if (!isOrderIdCollision(error) || attempt === 4) throw error;
+        order.orderId = generateOrderId();
+      }
+    }
     res.status(201).json({ ...order.toObject(), accessToken: order.accessToken });
   } catch (err) {
+    if (uploadedAsset && !orderSaved) {
+      if (!saveAttempted || isRejectedWrite(err)) await deleteUploadedAsset(uploadedAsset);
+      else console.error("Design upload cleanup deferred: database write outcome is unknown.");
+    }
     sendApiError(res, err, "Server Error", "createOrder");
   }
 };

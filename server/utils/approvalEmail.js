@@ -48,7 +48,7 @@ const serializeAdminOrder = (order, now = Date.now()) => {
 };
 
 const logOutcome = (orderId, outcome) => {
-  const safeOrderId = typeof orderId === "string" && /^GP-\d{6}$/.test(orderId)
+  const safeOrderId = typeof orderId === "string" && /^GP-(?:\d{6}|[A-F0-9]{16})$/.test(orderId)
     ? orderId : "unknown-order";
   console.log(`Approval email ${safeOrderId}: ${outcome}`);
 };

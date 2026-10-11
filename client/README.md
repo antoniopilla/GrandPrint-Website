@@ -24,6 +24,7 @@ Edit `.env` with your real values:
 | Variable                 | Description                                             |
 |--------------------------|---------------------------------------------------------|
 | `MONGO_URI`              | MongoDB connection string (local, or MongoDB Atlas)     |
+| `PORT`                   | Optional decimal TCP port (1–65535); defaults to 5000  |
 | `CLIENT_URL`             | Allowed frontend origin(s) for CORS (comma-separated)   |
 | `ADMIN_PASSWORD`         | Password to log into admin panel                        |
 | `JWT_SECRET`             | Secret used to sign admin session tokens                |
@@ -118,7 +119,25 @@ Existing Awaiting Payment orders without email metadata display Unknown. Other l
 
 To inspect provider events, open **Brevo → Transactional → Logs**, open the entry's eye icon, then **History**. Report event type and time only; redact recipients, sender addresses, message IDs, subjects, previews, and payment links. See [Brevo sender setup](https://help.brevo.com/hc/en-us/articles/208836149-Create-a-new-sender-From-name-and-From-email), [API key setup](https://help.brevo.com/hc/en-us/articles/209467485-Create-and-manage-your-API-keys), and [Render environment settings](https://render.com/docs/configure-environment-variables).
 
-This batch needs no new environment variables, dependencies, or bulk migration. Deploy the client first, then the server; the client handles unavailable resend routes until the server is updated. Rolling back the code removes tracking and resend behavior; optional metadata can remain stored harmlessly.
+Approval-email changes need no new environment variables, dependencies, or bulk migration. For those client and server changes, deploy the client first, then the server; the client handles unavailable resend routes until the server is updated. Rolling back that code removes tracking and resend behavior; optional metadata can remain stored harmlessly.
+
+### Order integrity and server startup
+
+New orders use `GP-` followed by 16 uppercase hexadecimal characters generated with crypto randomness. Existing six-digit IDs remain unchanged and usable; private access tokens are still required. The single-field unique `orderId` index remains required. Only a duplicate-key error explicitly identifying that index triggers a fresh ID, with at most five total save attempts. Artwork is uploaded once and reused during retries. Exhausted collisions retain the existing safe 409 conflict response.
+
+Order fields and the full model are validated before artwork upload. Failed saves that are known to be rejected delete the new Cloudinary asset using its returned public ID, resource type and delivery type. Concurrent receipt submissions keep the conditional status/token update: the losing request deletes only its own rejected upload. Successful saves retain their assets, including when sending the response fails. Cleanup failures preserve the original API error response and log a safe cleanup failure.
+
+Network or write-concern errors can leave the database write outcome unknown. Those assets are retained and cleanup is deferred, because the order or receipt may still be saved. An orphan may remain if the write never commits; there is no automatic cleanup queue or bulk deletion of existing assets.
+
+Startup requires nonblank `ADMIN_PASSWORD`, `JWT_SECRET`, `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET`. Production also requires `MONGO_URI` and the existing valid HTTPS `CUSTOMER_PORTAL_URL`. A supplied MongoDB URI must use `mongodb://` or `mongodb+srv://`; the driver checks the remaining URI details. Unset `MONGO_URI` retains the existing local fallback outside production. If supplied, `PORT` must be a decimal integer from 1 to 65535. Email/payment settings still fail only the email attempt; this batch does not add a production `CLIENT_URL` requirement.
+
+The backend validates startup settings before loading routes and waits for MongoDB to connect before listening. Failed configuration or connection prevents startup with a safe message. The root readiness route keeps its existing 200 response while Mongoose reports connected and returns 503 otherwise. Outage detection follows Mongoose's heartbeat timing; it is not instantaneous.
+
+Before the backend deployment, check settings in **Render → backend service → Environment → Environment Variables**. Add missing settings privately and select **Save only** to prepare without deploying. In **MongoDB Atlas → organization/project → Database → Data Explorer → application database → orders → Indexes**, inspect the single-field `orderId: 1` index (normally `orderId_1`): it must be Unique and have no Partial/Sparse restriction. Do not create, remove or change an index during this check. See [Atlas index inspection](https://www.mongodb.com/docs/atlas/atlas-ui/indexes/).
+
+In **Render → backend service → Settings → Health Checks**, inspect the configured HTTP health check path. To use the root readiness response after deploying the updated backend, click **Edit**, set the path to `/`, and click **Save Changes**. Without an HTTP path, Render's default TCP check does not inspect the database-aware response. No Render settings were changed by Codex. See [Render health checks](https://render.com/docs/health-checks).
+
+These integrity changes require only the backend deployment, with no new environment variables, dependencies or data migration. Rolling back restores the previous generator, cleanup and startup behavior; newer IDs remain readable as strings. Live Cloudinary deletion, production index presence, and real database concurrency must be verified separately by the owner.
 
 ---
 

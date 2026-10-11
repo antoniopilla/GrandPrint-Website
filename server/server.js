@@ -1,39 +1,64 @@
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
-const { getCustomerPortalUrl } = require("./config/customerPortal");
-getCustomerPortalUrl();
+const mongoose = require("mongoose");
+const { getStartupConfig } = require("./config/startup");
 const connectDB = require("./config/db");
-const orderRoutes = require("./routes/orderRoutes");
-const adminRoutes = require("./routes/adminRoutes");
-const customerRoutes = require("./routes/customerRoutes");
-const errorHandler = require("./middleware/errorHandler");
 
-const app = express();
+const startServer = async () => {
+  let config;
+  try {
+    config = getStartupConfig();
+  } catch (err) {
+    console.error(err.message);
+    process.exit(1);
+    return;
+  }
 
-connectDB();
+  const orderRoutes = require("./routes/orderRoutes");
+  const adminRoutes = require("./routes/adminRoutes");
+  const customerRoutes = require("./routes/customerRoutes");
+  const errorHandler = require("./middleware/errorHandler");
+  const app = express();
 
-// CORS: restrict to the allowed origins from CLIENT_URL (comma-separated).
-// When unset (local dev), allow all origins.
-const allowedOrigins = (process.env.CLIENT_URL || "")
-  .split(",")
-  .map((o) => o.trim())
-  .filter(Boolean);
+  // CORS: restrict to the allowed origins from CLIENT_URL (comma-separated).
+  // When unset (local dev), allow all origins.
+  const allowedOrigins = (process.env.CLIENT_URL || "")
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean);
 
-app.use(
-  cors({
-    origin: allowedOrigins.length ? allowedOrigins : true,
-    allowedHeaders: ["Content-Type", "Authorization", "X-Order-Access-Token"],
-  })
-);
-app.use(express.json());
+  app.use(
+    cors({
+      origin: allowedOrigins.length ? allowedOrigins : true,
+      allowedHeaders: ["Content-Type", "Authorization", "X-Order-Access-Token"],
+    })
+  );
+  app.use(express.json());
 
-app.use("/api/orders", orderRoutes);
-app.use("/api/admin", adminRoutes);
-app.use("/api/customers", customerRoutes);
+  app.use("/api/orders", orderRoutes);
+  app.use("/api/admin", adminRoutes);
+  app.use("/api/customers", customerRoutes);
 
-app.get("/", (req, res) => res.send("GrandPrint API is running."));
-app.use(errorHandler);
+  app.get("/", (req, res) => {
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).send("GrandPrint API is not ready.");
+    }
+    return res.send("GrandPrint API is running.");
+  });
+  app.use(errorHandler);
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+  try {
+    await connectDB(config.mongoUri);
+  } catch {
+    console.error("MongoDB connection failed. Check MONGO_URI and database access.");
+    process.exit(1);
+    return;
+  }
+
+  app.listen(config.port, () =>
+    console.log(`Server running on http://localhost:${config.port}`)
+  );
+};
+
+startServer();
