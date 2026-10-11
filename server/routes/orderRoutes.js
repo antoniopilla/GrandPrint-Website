@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const multer = require("multer");
+const { createValidatedUpload } = require("../middleware/uploadValidation");
 const requireAdmin = require("../middleware/auth");
 const requireOrderAccess = require("../middleware/orderAccess");
 const { lookupRateLimit } = require("../middleware/orderAccessRateLimit");
@@ -15,8 +15,9 @@ const {
 } = require("../controllers/orderController");
 
 // Files are kept in memory then streamed to Cloudinary in the controller.
-const upload = multer({
-  storage: multer.memoryStorage(),
+const upload = createValidatedUpload({
+  fieldName: "designFile",
+  kind: "design",
   limits: {
     fileSize: 20 * 1024 * 1024,
     files: 1,
@@ -28,7 +29,7 @@ const upload = multer({
 
 router.get("/", requireAdmin, getOrders);
 router.get("/lookup/:orderId", lookupRateLimit, requireOrderAccess, getOrderByOrderId);
-router.post("/", upload.single("designFile"), createOrder);
+router.post("/", upload, createOrder);
 router.put("/:id/status", requireAdmin, updateOrderStatus);
 router.put("/:id/approve", requireAdmin, approveOrder);
 router.post("/:id/access-link", requireAdmin, getOrderAccessLink);

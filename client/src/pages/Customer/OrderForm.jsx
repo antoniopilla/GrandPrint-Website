@@ -240,7 +240,7 @@ export default function OrderForm() {
                 <div style={s.fieldWrap}>
                   <label style={s.label}>Design File</label>
                   <label style={{ ...s.uploadBox, ...(file ? s.uploadBoxDone : {}) }}>
-                    <input type="file" accept=".jpg,.jpeg,.png,.pdf,.ai,.psd,.svg,.eps" onChange={e => setFile(e.target.files[0])} style={{ display: "none" }} />
+                    <input type="file" accept=".pdf,.png,.jpg,.jpeg,.psd,.ai,.eps" onChange={e => setFile(e.target.files[0])} style={{ display: "none" }} />
                     {file ? (
                       <>
                         <Check size={24} style={{ color: "var(--blue)" }} />
@@ -251,7 +251,7 @@ export default function OrderForm() {
                       <>
                         <Upload size={24} style={{ color: "var(--text3)" }} />
                         <span style={{ fontWeight: 600, fontSize: 14 }}>Click to upload design</span>
-                        <span style={{ fontSize: 12, color: "var(--text3)" }}>JPG, PNG, PDF, AI, PSD — max 20MB</span>
+                        <span style={{ fontSize: 12, color: "var(--text3)" }}>PDF, PNG, JPG/JPEG, PSD, AI, EPS — max 20MB</span>
                       </>
                     )}
                   </label>

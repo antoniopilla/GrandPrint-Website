@@ -1,14 +1,15 @@
 const express = require("express");
 const router = express.Router();
 const Order = require("../models/Order");
-const multer = require("multer");
+const { createValidatedUpload } = require("../middleware/uploadValidation");
 const { uploadBuffer } = require("../config/cloudinary");
 const requireOrderAccess = require("../middleware/orderAccess");
 const { paymentRateLimit } = require("../middleware/orderAccessRateLimit");
 
 // Payment proof is held in memory then streamed to Cloudinary below.
-const upload = multer({
-  storage: multer.memoryStorage(),
+const upload = createValidatedUpload({
+  fieldName: "paymentProof",
+  kind: "receipt",
   limits: {
     fileSize: 20 * 1024 * 1024,
     files: 1,
@@ -19,7 +20,7 @@ const upload = multer({
 });
 
 // PATCH route to submit payment proof
-router.patch("/pay/:orderId", paymentRateLimit, requireOrderAccess, upload.single("paymentProof"), async (req, res) => {
+router.patch("/pay/:orderId", paymentRateLimit, requireOrderAccess, upload, async (req, res) => {
   try {
     const order = req.order;
 

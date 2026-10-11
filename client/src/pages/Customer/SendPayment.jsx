@@ -176,13 +176,14 @@ export default function SendPayment() {
                       <label style={s.fileLabel}>
                         <input
                           type="file"
-                          accept="image/*"
+                          accept=".jpg,.jpeg,.png,.pdf"
                           onChange={(e) => setFile(e.target.files[0])}
                           style={{ display: "none" }}
                         />
                         <span style={s.fileBtn}>
                           {file ? (<><Check size={15} style={{ verticalAlign: "-3px", marginRight: 6 }} />{file.name}</>) : (<><Upload size={15} style={{ verticalAlign: "-3px", marginRight: 6 }} />Upload receipt</>)}
                         </span>
+                        <span style={{ fontSize: 12, color: "var(--text3)" }}>JPG/JPEG, PNG, PDF — max 20MB</span>
                       </label>
 
                       <button
