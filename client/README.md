@@ -25,7 +25,7 @@ Edit `.env` with your real values:
 |--------------------------|---------------------------------------------------------|
 | `MONGO_URI`              | MongoDB connection string (local, or MongoDB Atlas)     |
 | `PORT`                   | Optional decimal TCP port (1–65535); defaults to 5000  |
-| `CLIENT_URL`             | Allowed frontend origin(s) for CORS (comma-separated)   |
+| `CLIENT_URL`             | Allowed frontend origin(s) for CORS (comma-separated); required in production |
 | `ADMIN_PASSWORD`         | Password to log into admin panel                        |
 | `JWT_SECRET`             | Secret used to sign admin session tokens                |
 | `BREVO_API_KEY`          | Active Brevo API key (not an SMTP or MCP key)           |
@@ -67,8 +67,11 @@ npm run dev
 ```
 
 The frontend reads the backend URL from `VITE_API_URL` (see `client/.env.example`).
-Leave it unset for local dev (defaults to `http://localhost:5000`); in production set it
-to your deployed backend, e.g. `VITE_API_URL=https://grandprint-api.onrender.com`.
+Only the local development server may leave it unset and use `http://localhost:5000`.
+Every build and preview, including staging and builds using development mode, must
+set an absolute HTTP or HTTPS backend URL. Credentials, query strings and fragments
+are rejected; surrounding whitespace and trailing slashes are removed. Backend base
+paths are supported. Invalid settings stop the build before an unusable client is shipped.
 
 ---
 
@@ -129,7 +132,7 @@ Order fields and the full model are validated before artwork upload. Failed save
 
 Network or write-concern errors can leave the database write outcome unknown. Those assets are retained and cleanup is deferred, because the order or receipt may still be saved. An orphan may remain if the write never commits; there is no automatic cleanup queue or bulk deletion of existing assets.
 
-Startup requires nonblank `ADMIN_PASSWORD`, `JWT_SECRET`, `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET`. Production also requires `MONGO_URI` and the existing valid HTTPS `CUSTOMER_PORTAL_URL`. A supplied MongoDB URI must use `mongodb://` or `mongodb+srv://`; the driver checks the remaining URI details. Unset `MONGO_URI` retains the existing local fallback outside production. If supplied, `PORT` must be a decimal integer from 1 to 65535. Email/payment settings still fail only the email attempt; this batch does not add a production `CLIENT_URL` requirement.
+Startup requires nonblank `ADMIN_PASSWORD`, `JWT_SECRET`, `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET`. Production also requires `MONGO_URI`, the existing valid HTTPS `CUSTOMER_PORTAL_URL`, and at least one nonblank comma-separated `CLIENT_URL` origin. Missing or blank production `CLIENT_URL` stops startup before routes or the database are loaded. Development retains the existing CORS fallback. A supplied MongoDB URI must use `mongodb://` or `mongodb+srv://`; the driver checks the remaining URI details. Unset `MONGO_URI` retains the existing local fallback outside production. If supplied, `PORT` must be a decimal integer from 1 to 65535. Email/payment settings still fail only the email attempt.
 
 The backend validates startup settings before loading routes and waits for MongoDB to connect before listening. Failed configuration or connection prevents startup with a safe message. The root readiness route keeps its existing 200 response while Mongoose reports connected and returns 503 otherwise. Outage detection follows Mongoose's heartbeat timing; it is not instantaneous.
 
@@ -138,6 +141,22 @@ Before the backend deployment, check settings in **Render → backend service �
 In **Render → backend service → Settings → Health Checks**, inspect the configured HTTP health check path. To use the root readiness response after deploying the updated backend, click **Edit**, set the path to `/`, and click **Save Changes**. Without an HTTP path, Render's default TCP check does not inspect the database-aware response. No Render settings were changed by Codex. See [Render health checks](https://render.com/docs/health-checks).
 
 These integrity changes require only the backend deployment, with no new environment variables, dependencies or data migration. Rolling back restores the previous generator, cleanup and startup behavior; newer IDs remain readable as strings. Live Cloudinary deletion, production index presence, and real database concurrency must be verified separately by the owner.
+
+### API configuration and admin sessions
+
+Admin Dashboard requests use a dedicated client that adds the current admin token. A 401 response for that session clears the token and redirects to login for list, approval, status, Copy/Rotate link and email-resend requests. A delayed failure from an older session cannot clear a newer login. Customer requests and incorrect-password responses on the login page keep their existing handling.
+
+Admin login compares fixed-size SHA-256 password hashes using `timingSafeEqual`. Optional throttling allows 10 login requests per IP per 15 minutes, with at most 5,000 tracked IPs per server process. A blocked request receives HTTP 429 and `Retry-After`. All login attempts count; expired entries are discarded, and a full tracking table rejects new IPs instead of evicting active limits. Counts reset on restart and are not shared between instances.
+
+`ADMIN_LOGIN_RATE_LIMIT_ENABLED` is a new optional server setting. It remains disabled unless set to `true`; leave it unset or disabled until proxy handling is confirmed and the owner separately approves enabling it. The existing `ORDER_ACCESS_RATE_LIMIT_ENABLED` hold still applies. No proxy setting is changed by this batch, and no dependency or data migration is added.
+
+Before deploying these configuration and session changes:
+
+1. In **Vercel → frontend project → Settings → Environment Variables**, inspect `VITE_API_URL` for Production and any Preview environment you use. If missing or invalid, click **Add Environment Variable**, enter the setting privately, select the relevant environments, and click **Save**. Changes apply to the next deployment. See [Vercel environment settings](https://vercel.com/academy/vercel-foundations/vercel-settings).
+2. In **Render → backend service → Environment → Environment Variables**, inspect `CLIENT_URL` privately. It must contain the frontend origin(s) that may call the API, with no path or trailing slash. Use **+ Add Environment Variable** for a missing entry and choose **Save only** to prepare without deploying. Keep both IP-limit flags disabled. See [Render environment settings](https://render.com/docs/configure-environment-variables).
+3. Deploy the client first, then the server. After deployment, check a correct admin login, an incorrect-password message, and an expired-session redirect from a Dashboard action. Report only pass/fail and safe error wording; redact passwords, tokens, private links, customer details, full IP addresses and environment values. Live browser behavior and proxy-derived IP identity were not verified by local mocks.
+
+Rollback restores the previous API fallback, admin-session handling and login behavior. Leave rate-limit flags disabled while investigating. No stored orders or fields need changing.
 
 ---
 

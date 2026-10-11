@@ -13,6 +13,14 @@ const getStartupConfig = (env = process.env) => {
     (name) => typeof env[name] !== "string" || !env[name].trim()
   );
 
+  if (
+    env.NODE_ENV === "production" &&
+    (typeof env.CLIENT_URL !== "string" ||
+      !env.CLIENT_URL.split(",").some((origin) => origin.trim()))
+  ) {
+    invalid.push("CLIENT_URL");
+  }
+
   let mongoUri = "mongodb://127.0.0.1:27017/printingPOS";
   if (env.MONGO_URI !== undefined) {
     if (

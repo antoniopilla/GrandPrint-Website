@@ -1,7 +1,6 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
-import { API } from "../../config";
+import { createAdminApi } from "../../adminApi";
 import { getApiErrorMessage } from "../../apiErrors";
 import { getApprovalEmailInfo, isValidApprovalEmail } from "../../approvalEmail";
 import ThemeToggle from "../../ThemeToggle";
@@ -23,12 +22,9 @@ const STATUS = {
   "Fully Paid":           { label: "Fully Paid",        color: "var(--text3)",   bg: "var(--bg3)" },
 };
 
-const authHeaders = () => ({
-  headers: { Authorization: `Bearer ${sessionStorage.getItem("adminToken")}` },
-});
-
 export default function AdminDashboard() {
   const nav = useNavigate();
+  const adminApi = useMemo(() => createAdminApi(() => nav("/admin/login", { replace: true })), [nav]);
   const isMobile = useIsMobile();
   const [tab, setTab] = useState("pending");
   const [orders, setOrders] = useState([]);
@@ -45,19 +41,15 @@ export default function AdminDashboard() {
 
   const fetchOrders = useCallback(async () => {
     try {
-      const res = await axios.get(`${API}/api/orders`, authHeaders());
+      const res = await adminApi.get("/api/orders");
       setOrders(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
-      if (err.response?.status === 401) {
-        sessionStorage.removeItem("adminToken");
-        nav("/admin/login", { replace: true });
-        return;
-      }
+      if (err.response?.status === 401) return;
       console.error("Failed to fetch orders:", err.message);
     } finally {
       setLoading(false);
     }
-  }, [nav]);
+  }, [adminApi]);
 
   useEffect(() => {
     fetchOrders();
@@ -73,9 +65,10 @@ export default function AdminDashboard() {
   const changeStatus = async (id, status) => {
     setActionLoading(id);
     try {
-      await axios.put(`${API}/api/orders/${id}/status`, { status }, authHeaders());
+      await adminApi.put(`/api/orders/${id}/status`, { status });
       await fetchOrders();
     } catch (err) {
+      if (err.response?.status === 401) return;
       if (err.response?.status === 409) await fetchOrders();
       alert(getApiErrorMessage(err, "Failed to update status. Try again."));
     } finally {
@@ -88,11 +81,12 @@ export default function AdminDashboard() {
     if (!Number.isFinite(p) || p <= 0) return alert("Enter a valid price.");
     setApproving(true);
     try {
-      await axios.put(`${API}/api/orders/${modal._id}/approve`, { price: p }, authHeaders());
+      await adminApi.put(`/api/orders/${modal._id}/approve`, { price: p });
       setModal(null);
       setPrice("");
       await fetchOrders();
     } catch (err) {
+      if (err.response?.status === 401) return;
       if (err.response?.status === 409) await fetchOrders();
       alert(getApiErrorMessage(err, "Approval failed. Please try again."));
     } finally {
@@ -106,7 +100,7 @@ export default function AdminDashboard() {
     setLinkNotice("");
     setManualLink("");
     try {
-      const res = await axios.post(`${API}/api/orders/${id}/access-link${rotate ? "/rotate" : ""}`, {}, authHeaders());
+      const res = await adminApi.post(`/api/orders/${id}/access-link${rotate ? "/rotate" : ""}`, {});
       if (typeof res.data.paymentLink !== "string") throw new Error("Payment link unavailable");
       try {
         await navigator.clipboard.writeText(res.data.paymentLink);
@@ -116,6 +110,7 @@ export default function AdminDashboard() {
         setLinkNotice(rotate ? "Link rotated. Copy the private link below; the previous link is invalid." : "Copy the private payment link below.");
       }
     } catch (err) {
+      if (err.response?.status === 401) return;
       if (err.response?.status === 404) {
         setLinkNotice("Payment links are not available yet. Try again after the server update.");
       } else {
@@ -141,10 +136,11 @@ export default function AdminDashboard() {
     setEmailLoading(order._id);
     setEmailNotice("");
     try {
-      await axios.post(`${API}/api/orders/${order._id}/approval-email/resend`, { confirmDuplicate }, authHeaders());
+      await adminApi.post(`/api/orders/${order._id}/approval-email/resend`, { confirmDuplicate });
       setEmailNotice("Approval email send started. Refresh to check its status.");
       await fetchOrders();
     } catch (err) {
+      if (err.response?.status === 401) return;
       if (err.response?.status === 409) await fetchOrders();
       setEmailNotice(err.response?.status === 404
         ? "Email resend is not available yet. Try again after the server update."
