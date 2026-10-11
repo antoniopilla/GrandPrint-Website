@@ -3,6 +3,18 @@ const sendApprovalEmail = require("../utils/emailService");
 const { uploadBuffer } = require("../config/cloudinary");
 const { generateAccessToken } = require("../utils/orderAccess");
 const { buildPaymentLink } = require("../config/customerPortal");
+const { sendApiError } = require("../utils/apiError");
+const { validateOrderInput, sendValidationErrors, parseNumber, isValidPrice } = require("../utils/orderValidation");
+
+const STATUS_PREDECESSORS = {
+  Printing: ["Awaiting Downpayment", "Payment Submitted"],
+  Completed: ["Printing"],
+  "Fully Paid": ["Completed"],
+};
+const statusConflict = (res) => res.status(409).json({
+  code: "INVALID_TRANSITION",
+  message: "Order status has changed or this transition is not allowed. Please refresh and try again.",
+});
 
 const provisionAccessToken = async (id) => {
   const order = await Order.findById(id).select("+accessToken");
@@ -35,8 +47,9 @@ const generateOrderId = async () => {
 // POST /api/orders
 exports.createOrder = async (req, res) => {
   try {
-    const { customerName, email, contactNumber, productType, width, height, pieces, notes } =
-      req.body;
+    const { values, errors } = validateOrderInput(req.body);
+    if (Object.keys(errors).length) return sendValidationErrors(res, errors);
+    const { customerName, email, contactNumber, productType, width, height, pieces, notes } = values;
 
     let designFile = null;
     if (req.file) {
@@ -59,18 +72,17 @@ exports.createOrder = async (req, res) => {
       email,
       contactNumber,
       productType,
-      width: Number(width),
-      height: Number(height),
-      pieces: Number(pieces),
-      notes: notes || "",
+      width,
+      height,
+      pieces,
+      notes,
       designFile,
     });
 
     await order.save();
     res.status(201).json({ ...order.toObject(), accessToken: order.accessToken });
   } catch (err) {
-    console.error("createOrder:", err);
-    res.status(500).json({ message: "Server Error", detail: err.message });
+    sendApiError(res, err, "Server Error", "createOrder");
   }
 };
 
@@ -80,7 +92,7 @@ exports.getOrders = async (req, res) => {
     const orders = await Order.find().sort({ createdAt: -1 });
     res.json(orders);
   } catch (err) {
-    res.status(500).json({ message: "Server Error" });
+    sendApiError(res, err, "Server Error", "getOrders");
   }
 };
 
@@ -105,7 +117,7 @@ exports.getOrderAccessLink = async (req, res) => {
     if (!order) return res.status(404).json({ message: "Order not found" });
     res.json({ orderId: order.orderId, paymentLink: buildPaymentLink(order.orderId, order.accessToken) });
   } catch (err) {
-    res.status(500).json({ message: "Unable to create payment link" });
+    sendApiError(res, err, "Unable to create payment link", "getOrderAccessLink");
   }
 };
 
@@ -120,58 +132,73 @@ exports.rotateOrderAccessLink = async (req, res) => {
     if (!order) return res.status(404).json({ message: "Order not found" });
     res.json({ orderId: order.orderId, paymentLink: buildPaymentLink(order.orderId, order.accessToken) });
   } catch (err) {
-    res.status(500).json({ message: "Unable to rotate payment link" });
+    sendApiError(res, err, "Unable to rotate payment link", "rotateOrderAccessLink");
   }
 };
 
-// PUT /api/orders/:id/status  — simple status change (no email)
+// PUT /api/orders/:id/status  — advance the approved lifecycle (no email)
 exports.updateOrderStatus = async (req, res) => {
   try {
-    const { status } = req.body;
-    const order = await Order.findByIdAndUpdate(
-      req.params.id,
-      { status },
-      { new: true }
+    const status = req.body?.status;
+    if (typeof status !== "string" || !Order.schema.path("status").enumValues.includes(status)) {
+      return sendValidationErrors(res, { status: "Select a valid order status." });
+    }
+    const previousStatuses = STATUS_PREDECESSORS[status];
+    if (!previousStatuses) {
+      if (!await Order.exists({ _id: req.params.id })) return res.status(404).json({ message: "Order not found" });
+      return statusConflict(res);
+    }
+    const order = await Order.findOneAndUpdate(
+      { _id: req.params.id, status: { $in: previousStatuses } },
+      { $set: { status } },
+      { new: true, runValidators: true }
     );
-    if (!order) return res.status(404).json({ message: "Order not found" });
+    if (!order) {
+      if (!await Order.exists({ _id: req.params.id })) return res.status(404).json({ message: "Order not found" });
+      return statusConflict(res);
+    }
     res.json(order);
   } catch (err) {
-    res.status(500).json({ message: "Error updating status" });
+    sendApiError(res, err, "Error updating status", "updateOrderStatus");
   }
 };
 
 // PUT /api/orders/:id/approve  — set price + send email to client
 exports.approveOrder = async (req, res) => {
   try {
-    const { price } = req.body;
-
-    if (!price || isNaN(price) || Number(price) <= 0) {
-      return res.status(400).json({ message: "A valid price is required." });
+    const price = parseNumber(req.body?.price);
+    if (!isValidPrice(price)) {
+      return sendValidationErrors(res, { price: "Enter a finite price greater than zero." });
     }
 
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: "Order not found" });
 
     if (order.status !== "Pending Approval") {
-      return res.status(400).json({ message: "Order is not pending approval." });
+      return statusConflict(res);
     }
 
     const accessOrder = await provisionAccessToken(order._id);
     if (!accessOrder) return res.status(404).json({ message: "Order not found" });
 
-    order.price = Number(price);
-    order.status = "Awaiting Downpayment";
-    await order.save();
+    const approvedOrder = await Order.findOneAndUpdate(
+      { _id: req.params.id, status: "Pending Approval" },
+      { $set: { price, status: "Awaiting Downpayment" } },
+      { new: true, runValidators: true }
+    ).select("+accessToken");
+    if (!approvedOrder) {
+      if (!await Order.exists({ _id: req.params.id })) return res.status(404).json({ message: "Order not found" });
+      return statusConflict(res);
+    }
 
     // Reply immediately — don't make the admin wait on SMTP/email delivery.
-    res.json({ order });
+    res.json({ order: approvedOrder });
 
     // Send the approval email in the background; log (don't crash) if it fails.
-    sendApprovalEmail({ ...order.toObject(), accessToken: accessOrder.accessToken }).catch((emailErr) =>
+    sendApprovalEmail({ ...approvedOrder.toObject(), accessToken: approvedOrder.accessToken }).catch((emailErr) =>
       console.error("Email failed (order still approved):", emailErr.message)
     );
   } catch (err) {
-    console.error("approveOrder:", err);
-    res.status(500).json({ message: "Server error", detail: err.message });
+    sendApiError(res, err, "Server error", "approveOrder");
   }
 };

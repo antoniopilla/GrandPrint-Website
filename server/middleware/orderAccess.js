@@ -1,5 +1,6 @@
 const Order = require("../models/Order");
 const { isValidAccessToken, compareAccessTokens } = require("../utils/orderAccess");
+const { sendApiError } = require("../utils/apiError");
 
 const invalidLink = (res) => res.status(404).json({
   message: "This payment link is invalid or outdated. Please contact GrandPrint",
@@ -17,7 +18,7 @@ const requireOrderAccess = async (req, res, next) => {
     req.order = order;
     next();
   } catch (err) {
-    res.status(500).json({ message: "Server Error" });
+    sendApiError(res, err, "Server Error", "requireOrderAccess");
   }
 };
 

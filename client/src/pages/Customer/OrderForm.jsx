@@ -2,22 +2,33 @@ import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { API } from "../../config";
+import { getApiErrorMessage } from "../../apiErrors";
 import ThemeToggle from "../../ThemeToggle";
 import { Check, Upload, Lightbulb, TriangleAlert } from "lucide-react";
 import { MAX_UPLOAD_BYTES, FILE_SIZE_MESSAGE, MESSENGER_URL, getUploadErrorMessage } from "../../uploadLimits";
 
 const STEPS = ["Your Details", "Order Info", "Review & Submit"];
+const PRODUCT_TYPES = ["Tarpaulin", "Sintra Board", "Sticker"];
+
+const dimensionError = (value, label) => {
+  const dimension = Number(value);
+  return Number.isFinite(dimension) && dimension > 0 && dimension <= 100
+    ? null
+    : `${label} must be greater than 0 and no more than 100 feet.`;
+};
 
 // ── Validators ──────────────────────────────────────────────────────────────
 const validate = {
   customerName: (v) => {
     if (!v.trim()) return "Full name is required.";
+    if (v.trim().length > 120) return "Name must be no more than 120 characters.";
     if (v.trim().length < 2) return "Name must be at least 2 characters.";
     if (/^\d+$/.test(v.trim())) return "Name cannot be only numbers.";
     return null;
   },
   email: (v) => {
     if (!v.trim()) return "Email address is required.";
+    if (v.trim().length > 254) return "Email must be no more than 254 characters.";
     // RFC 5322-lite: local@domain.tld
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim()))
       return "Enter a valid email address (e.g. you@email.com).";
@@ -25,12 +36,20 @@ const validate = {
   },
   contactNumber: (v) => {
     if (!v.trim()) return "Contact number is required.";
+    if (v.trim().length > 30) return "Contact number must be no more than 30 characters.";
     // Accept 09XXXXXXXXX or +639XXXXXXXXX
     const digits = v.replace(/[\s\-]/g, "");
     if (!/^(\+63|0)(9\d{9})$/.test(digits))
       return "Enter a valid PH mobile number (e.g. 09171234567).";
     return null;
   },
+  productType: (v) => PRODUCT_TYPES.includes(v.trim()) ? null : "Please choose a product type.",
+  width: (v) => dimensionError(v, "Width"),
+  height: (v) => dimensionError(v, "Height"),
+  pieces: (v) => Number.isInteger(Number(v)) && Number(v) >= 1 && Number(v) <= 10000
+    ? null
+    : "Pieces must be a whole number from 1 to 10,000.",
+  notes: (v) => v.trim().length <= 5000 ? null : "Notes must be no more than 5,000 characters.",
 };
 
 // ── Live input formatters (restrict/normalize as the user types) ──────────────
@@ -84,19 +103,12 @@ export default function OrderForm() {
   const touch = (name) => setTouched(t => ({ ...t, [name]: true }));
 
   // Per-field errors (only shown after blur/touch)
-  const errors = {
-    customerName: validate.customerName(form.customerName),
-    email: validate.email(form.email),
-    contactNumber: validate.contactNumber(form.contactNumber),
-  };
+  const errors = Object.fromEntries(Object.entries(validate).map(([name, validator]) => [name, validator(form[name])]));
 
   const step0Valid =
     !errors.customerName && !errors.email && !errors.contactNumber;
   const step1OK =
-    form.productType &&
-    Number(form.width) > 0 &&
-    Number(form.height) > 0 &&
-    Number(form.pieces) > 0 &&
+    !errors.productType && !errors.width && !errors.height && !errors.pieces && !errors.notes &&
     file;
 
   // Touch all step-0 fields to show errors on attempted Continue
@@ -128,18 +140,23 @@ export default function OrderForm() {
       setStep(1);
       return;
     }
+    if (!step0Valid || !step1OK) {
+      setTouched(Object.fromEntries(Object.keys(validate).map(name => [name, true])));
+      setStep(step0Valid ? 1 : 0);
+      return;
+    }
     setUploadError("");
     setSubmitting(true);
     try {
       const fd = new FormData();
-      Object.entries(form).forEach(([k, v]) => fd.append(k, v));
+      Object.entries(form).forEach(([k, v]) => fd.append(k, v.trim()));
       fd.append("designFile", file);
       const res = await axios.post(`${API}/api/orders`, fd, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       nav("/order/done", { state: { order: res.data } });
     } catch (err) {
-      setUploadError(getUploadErrorMessage(err, "Something went wrong. Please check your connection and try again."));
+      setUploadError(getUploadErrorMessage(err, getApiErrorMessage(err, "Something went wrong. Please check your connection and try again.")));
     } finally {
       setSubmitting(false);
     }
@@ -233,7 +250,7 @@ export default function OrderForm() {
                 <div style={s.fieldWrap}>
                   <label style={s.label}>Product Type</label>
                   <div style={s.productGrid}>
-                    {["Tarpaulin", "Sintra Board", "Sticker"].map(p => (
+                    {PRODUCT_TYPES.map(p => (
                       <button
                         key={p}
                         type="button"
@@ -247,19 +264,23 @@ export default function OrderForm() {
                       </button>
                     ))}
                   </div>
+                  {touched.productType && errors.productType && <span style={s.errorMsg}>{errors.productType}</span>}
                 </div>
 
                 {/* Dimensions */}
                 <div style={s.fieldWrap}>
                   <label style={s.label}>Dimensions <span style={{ color: "var(--text3)", fontWeight: 400 }}>(in feet)</span></label>
                   <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                    <input name="width" type="text" inputMode="decimal" placeholder="Width" value={form.width} onChange={set} style={s.input} />
+                    <input name="width" type="text" inputMode="decimal" placeholder="Width" value={form.width} onChange={set} onBlur={() => touch("width")} style={{ ...s.input, borderColor: touched.width && errors.width ? "var(--red)" : "transparent" }} />
                     <span style={{ color: "var(--text3)", fontSize: 18, flexShrink: 0 }}>×</span>
-                    <input name="height" type="text" inputMode="decimal" placeholder="Height" value={form.height} onChange={set} style={s.input} />
+                    <input name="height" type="text" inputMode="decimal" placeholder="Height" value={form.height} onChange={set} onBlur={() => touch("height")} style={{ ...s.input, borderColor: touched.height && errors.height ? "var(--red)" : "transparent" }} />
                   </div>
+                  {((touched.width && errors.width) || (touched.height && errors.height)) && (
+                    <span style={s.errorMsg}>{(touched.width && errors.width) || errors.height}</span>
+                  )}
                 </div>
 
-                <Field label="Number of Pieces" name="pieces" type="text" inputMode="numeric" value={form.pieces} onChange={set} placeholder="1" />
+                <Field label="Number of Pieces" name="pieces" type="text" inputMode="numeric" value={form.pieces} onChange={set} onBlur={() => touch("pieces")} placeholder="1" error={touched.pieces ? errors.pieces : null} />
 
                 {/* File upload */}
                 <div style={s.fieldWrap}>
@@ -285,7 +306,8 @@ export default function OrderForm() {
                 {/* Notes */}
                 <div style={s.fieldWrap}>
                   <label style={s.label}>Notes <span style={{ color: "var(--text3)", fontWeight: 400 }}>(optional)</span></label>
-                  <textarea name="notes" value={form.notes} onChange={set} placeholder="Special instructions, color preferences, finishing details..." rows={3} style={{ ...s.input, resize: "vertical", lineHeight: 1.6 }} />
+                  <textarea name="notes" value={form.notes} onChange={set} onBlur={() => touch("notes")} placeholder="Special instructions, color preferences, finishing details..." rows={3} style={{ ...s.input, resize: "vertical", lineHeight: 1.6 }} />
+                  {touched.notes && errors.notes && <span style={s.errorMsg}>{errors.notes}</span>}
                 </div>
               </div>
             </div>

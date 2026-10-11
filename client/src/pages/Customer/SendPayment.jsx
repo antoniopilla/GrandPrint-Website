@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import axios from "axios";
 import { API } from "../../config";
+import { getApiErrorMessage } from "../../apiErrors";
 import ThemeToggle from "../../ThemeToggle";
 import { Check, Upload } from "lucide-react";
 import { capturePaymentToken, forgetPaymentToken } from "../../paymentAccess";
@@ -109,7 +110,7 @@ export default function SendPayment() {
         setFile(null);
         setInvalidLink(true);
       } else {
-        setSubmitError(getUploadErrorMessage(err, "Failed to submit payment. Please try again."));
+        setSubmitError(getUploadErrorMessage(err, getApiErrorMessage(err, "Failed to submit payment. Please try again.")));
       }
     } finally {
       setSubmitting(false);

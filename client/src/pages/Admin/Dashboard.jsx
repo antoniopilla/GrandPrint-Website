@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { API } from "../../config";
+import { getApiErrorMessage } from "../../apiErrors";
 import ThemeToggle from "../../ThemeToggle";
 import { useIsMobile } from "../../useMediaQuery";
 import { TriangleAlert, RefreshCw, Inbox, Printer, CircleCheck, Check } from "lucide-react";
@@ -72,7 +73,8 @@ export default function AdminDashboard() {
       await axios.put(`${API}/api/orders/${id}/status`, { status }, authHeaders());
       await fetchOrders();
     } catch (err) {
-      alert("Failed to update status. Try again.");
+      if (err.response?.status === 409) await fetchOrders();
+      alert(getApiErrorMessage(err, "Failed to update status. Try again."));
     } finally {
       setActionLoading(null);
     }
@@ -80,7 +82,7 @@ export default function AdminDashboard() {
 
   const doApprove = async () => {
     const p = Number(price);
-    if (!p || p <= 0) return alert("Enter a valid price.");
+    if (!Number.isFinite(p) || p <= 0) return alert("Enter a valid price.");
     setApproving(true);
     try {
       await axios.put(`${API}/api/orders/${modal._id}/approve`, { price: p }, authHeaders());
@@ -88,7 +90,8 @@ export default function AdminDashboard() {
       setPrice("");
       await fetchOrders();
     } catch (err) {
-      alert(err.response?.data?.message || "Approval failed. Check server logs.");
+      if (err.response?.status === 409) await fetchOrders();
+      alert(getApiErrorMessage(err, "Approval failed. Please try again."));
     } finally {
       setApproving(false);
     }
@@ -272,9 +275,9 @@ export default function AdminDashboard() {
             <div style={s.modalBtns}>
               <button style={s.cancelBtn} onClick={() => setModal(null)}>Cancel</button>
               <button
-                style={{ ...s.approveBtn, opacity: !price || approving ? 0.5 : 1 }}
+                style={{ ...s.approveBtn, opacity: !Number.isFinite(Number(price)) || Number(price) <= 0 || approving ? 0.5 : 1 }}
                 onClick={doApprove}
-                disabled={!price || approving}
+                disabled={!Number.isFinite(Number(price)) || Number(price) <= 0 || approving}
               >
                 {approving ? "Sending…" : (<><Check size={16} /> Approve &amp; Email Client</>)}
               </button>
@@ -326,6 +329,16 @@ function OrderCard({ order, onApprove, onStatusChange, actionLoading, onPaymentL
       <div style={s.cardFoot}>
         <span style={s.orderIdBadge}>{order.orderId}</span>
         <div style={s.actions}>
+          {order.designFile && (
+            <a
+              href={order.designFile}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ fontSize: 13, fontWeight: 600, color: "var(--text2)", alignSelf: "center" }}
+            >
+              View / Download Artwork
+            </a>
+          )}
           <ActionBtn color="var(--text2)" bg="var(--bg3)" onClick={() => onPaymentLink(order._id)} loading={linkLoading}>
             Copy payment link
           </ActionBtn>
@@ -338,8 +351,12 @@ function OrderCard({ order, onApprove, onStatusChange, actionLoading, onPaymentL
             </ActionBtn>
           )}
           {order.status === "Awaiting Downpayment" && (
-            <ActionBtn color="var(--blue)" bg="var(--blue-light)" onClick={() => onStatusChange(order._id, "Printing")} loading={actionLoading}>
-              Confirm Payment → Start Printing
+            <ActionBtn color="var(--blue)" bg="var(--blue-light)" onClick={() => {
+              if (window.confirm("Confirm you have seen and verified the receipt on Messenger?")) {
+                onStatusChange(order._id, "Printing");
+              }
+            }} loading={actionLoading}>
+              Confirm Payment (Messenger) → Start Printing
             </ActionBtn>
           )}
           {order.status === "Payment Submitted" && (

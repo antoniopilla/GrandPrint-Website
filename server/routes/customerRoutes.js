@@ -5,6 +5,7 @@ const { createValidatedUpload } = require("../middleware/uploadValidation");
 const { uploadBuffer } = require("../config/cloudinary");
 const requireOrderAccess = require("../middleware/orderAccess");
 const { paymentRateLimit } = require("../middleware/orderAccessRateLimit");
+const { sendApiError } = require("../utils/apiError");
 
 // Payment proof is held in memory then streamed to Cloudinary below.
 const upload = createValidatedUpload({
@@ -24,11 +25,12 @@ router.patch("/pay/:orderId", paymentRateLimit, requireOrderAccess, upload, asyn
   try {
     const order = req.order;
 
-    if (!req.file) return res.status(400).json({ message: "Payment proof is required" });
+    if (!req.file) return res.status(400).json({ code: "VALIDATION_ERROR", message: "Payment proof is required" });
 
     if (order.status !== "Awaiting Downpayment") {
-      return res.status(400).json({
-        message: `Order is not awaiting payment (current status: ${order.status}).`,
+      return res.status(409).json({
+        code: "INVALID_TRANSITION",
+        message: "Order status has changed or this transition is not allowed. Please refresh and try again.",
       });
     }
 
@@ -43,11 +45,17 @@ router.patch("/pay/:orderId", paymentRateLimit, requireOrderAccess, upload, asyn
       });
     }
     const updatedOrder = await Order.findOneAndUpdate(
-      { _id: order._id, accessToken: order.accessToken },
+      { _id: order._id, accessToken: order.accessToken, status: "Awaiting Downpayment" },
       { $set: { paymentProof: result.secure_url, status: "Payment Submitted" } },
-      { new: true }
+      { new: true, runValidators: true }
     );
     if (!updatedOrder) {
+      if (await Order.exists({ _id: order._id, accessToken: order.accessToken })) {
+        return res.status(409).json({
+          code: "INVALID_TRANSITION",
+          message: "Order status has changed or this transition is not allowed. Please refresh and try again.",
+        });
+      }
       return res.status(404).json({
         message: "This payment link is invalid or outdated. Please contact GrandPrint",
       });
@@ -55,8 +63,7 @@ router.patch("/pay/:orderId", paymentRateLimit, requireOrderAccess, upload, asyn
 
     res.json({ orderId: updatedOrder.orderId, status: updatedOrder.status });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server Error" });
+    sendApiError(res, err, "Server Error", "Payment submission failed");
   }
 });
 

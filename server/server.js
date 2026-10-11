@@ -7,6 +7,7 @@ const connectDB = require("./config/db");
 const orderRoutes = require("./routes/orderRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const customerRoutes = require("./routes/customerRoutes");
+const errorHandler = require("./middleware/errorHandler");
 
 const app = express();
 
@@ -32,6 +33,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/customers", customerRoutes);
 
 app.get("/", (req, res) => res.send("GrandPrint API is running."));
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
