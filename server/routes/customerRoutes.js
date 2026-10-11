@@ -3,6 +3,8 @@ const router = express.Router();
 const Order = require("../models/Order");
 const multer = require("multer");
 const { uploadBuffer } = require("../config/cloudinary");
+const requireOrderAccess = require("../middleware/orderAccess");
+const { paymentRateLimit } = require("../middleware/orderAccessRateLimit");
 
 // Payment proof is held in memory then streamed to Cloudinary below.
 const upload = multer({
@@ -11,10 +13,9 @@ const upload = multer({
 });
 
 // PATCH route to submit payment proof
-router.patch("/pay/:orderId", upload.single("paymentProof"), async (req, res) => {
+router.patch("/pay/:orderId", paymentRateLimit, requireOrderAccess, upload.single("paymentProof"), async (req, res) => {
   try {
-    const order = await Order.findOne({ orderId: req.params.orderId });
-    if (!order) return res.status(404).json({ message: "Order not found" });
+    const order = req.order;
 
     if (!req.file) return res.status(400).json({ message: "Payment proof is required" });
 
@@ -25,12 +26,18 @@ router.patch("/pay/:orderId", upload.single("paymentProof"), async (req, res) =>
     }
 
     const result = await uploadBuffer(req.file.buffer, "grandprint/payments");
-    order.paymentProof = result.secure_url;
-    order.status = "Payment Submitted";
+    const updatedOrder = await Order.findOneAndUpdate(
+      { _id: order._id, accessToken: order.accessToken },
+      { $set: { paymentProof: result.secure_url, status: "Payment Submitted" } },
+      { new: true }
+    );
+    if (!updatedOrder) {
+      return res.status(404).json({
+        message: "This payment link is invalid or outdated. Please contact GrandPrint",
+      });
+    }
 
-    await order.save();
-
-    res.json({ message: "Payment submitted successfully", order });
+    res.json({ orderId: updatedOrder.orderId, status: updatedOrder.status });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server Error" });

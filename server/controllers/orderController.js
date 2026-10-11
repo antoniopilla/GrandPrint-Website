@@ -1,6 +1,27 @@
 const Order = require("../models/Order");
 const sendApprovalEmail = require("../utils/emailService");
 const { uploadBuffer } = require("../config/cloudinary");
+const { generateAccessToken } = require("../utils/orderAccess");
+const { buildPaymentLink } = require("../config/customerPortal");
+
+const provisionAccessToken = async (id) => {
+  const order = await Order.findById(id).select("+accessToken");
+  if (!order || order.accessToken) return order;
+
+  const provisioned = await Order.findOneAndUpdate(
+    {
+      _id: id,
+      $or: [
+        { accessToken: { $exists: false } },
+        { accessToken: null },
+        { accessToken: "" },
+      ],
+    },
+    { $set: { accessToken: generateAccessToken() } },
+    { new: true }
+  ).select("+accessToken");
+  return provisioned || Order.findById(id).select("+accessToken");
+};
 
 const generateOrderId = async () => {
   let id, exists = true;
@@ -25,6 +46,7 @@ exports.createOrder = async (req, res) => {
 
     const order = new Order({
       orderId: await generateOrderId(),
+      accessToken: generateAccessToken(),
       customerName,
       email,
       contactNumber,
@@ -37,7 +59,7 @@ exports.createOrder = async (req, res) => {
     });
 
     await order.save();
-    res.status(201).json(order);
+    res.status(201).json({ ...order.toObject(), accessToken: order.accessToken });
   } catch (err) {
     console.error("createOrder:", err);
     res.status(500).json({ message: "Server Error", detail: err.message });
@@ -54,16 +76,43 @@ exports.getOrders = async (req, res) => {
   }
 };
 
-// GET /api/orders/lookup/:orderId — public, sanitized lookup for the customer payment page
+// GET /api/orders/lookup/:orderId — authorized customer payment lookup
 exports.getOrderByOrderId = async (req, res) => {
+  const order = req.order;
+  res.json({
+    orderId: order.orderId,
+    productType: order.productType,
+    width: order.width,
+    height: order.height,
+    pieces: order.pieces,
+    price: order.price,
+    status: order.status,
+  });
+};
+
+// POST /api/orders/:id/access-link — reuse a token or provision one for a legacy order
+exports.getOrderAccessLink = async (req, res) => {
   try {
-    const order = await Order.findOne({ orderId: req.params.orderId }).select(
-      "orderId customerName productType price status width height pieces createdAt"
-    );
+    const order = await provisionAccessToken(req.params.id);
     if (!order) return res.status(404).json({ message: "Order not found" });
-    res.json(order);
+    res.json({ orderId: order.orderId, paymentLink: buildPaymentLink(order.orderId, order.accessToken) });
   } catch (err) {
-    res.status(500).json({ message: "Server Error" });
+    res.status(500).json({ message: "Unable to create payment link" });
+  }
+};
+
+// POST /api/orders/:id/access-link/rotate — invalidate the previous private link
+exports.rotateOrderAccessLink = async (req, res) => {
+  try {
+    const order = await Order.findByIdAndUpdate(
+      req.params.id,
+      { $set: { accessToken: generateAccessToken() } },
+      { new: true }
+    ).select("+accessToken");
+    if (!order) return res.status(404).json({ message: "Order not found" });
+    res.json({ orderId: order.orderId, paymentLink: buildPaymentLink(order.orderId, order.accessToken) });
+  } catch (err) {
+    res.status(500).json({ message: "Unable to rotate payment link" });
   }
 };
 
@@ -99,6 +148,9 @@ exports.approveOrder = async (req, res) => {
       return res.status(400).json({ message: "Order is not pending approval." });
     }
 
+    const accessOrder = await provisionAccessToken(order._id);
+    if (!accessOrder) return res.status(404).json({ message: "Order not found" });
+
     order.price = Number(price);
     order.status = "Awaiting Downpayment";
     await order.save();
@@ -107,7 +159,7 @@ exports.approveOrder = async (req, res) => {
     res.json({ order });
 
     // Send the approval email in the background; log (don't crash) if it fails.
-    sendApprovalEmail(order).catch((emailErr) =>
+    sendApprovalEmail({ ...order.toObject(), accessToken: accessOrder.accessToken }).catch((emailErr) =>
       console.error("Email failed (order still approved):", emailErr.message)
     );
   } catch (err) {

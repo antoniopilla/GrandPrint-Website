@@ -35,6 +35,9 @@ export default function AdminDashboard() {
   const [price, setPrice] = useState("");
   const [approving, setApproving] = useState(false);
   const [actionLoading, setActionLoading] = useState(null); // orderId being updated
+  const [linkLoading, setLinkLoading] = useState(null);
+  const [linkNotice, setLinkNotice] = useState("");
+  const [manualLink, setManualLink] = useState("");
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -88,6 +91,32 @@ export default function AdminDashboard() {
       alert(err.response?.data?.message || "Approval failed. Check server logs.");
     } finally {
       setApproving(false);
+    }
+  };
+
+  const copyPaymentLink = async (id, rotate = false) => {
+    if (rotate && !window.confirm("Rotate this payment link? The previous link will stop working.")) return;
+    setLinkLoading(id);
+    setLinkNotice("");
+    setManualLink("");
+    try {
+      const res = await axios.post(`${API}/api/orders/${id}/access-link${rotate ? "/rotate" : ""}`, {}, authHeaders());
+      if (typeof res.data.paymentLink !== "string") throw new Error("Payment link unavailable");
+      try {
+        await navigator.clipboard.writeText(res.data.paymentLink);
+        setLinkNotice(rotate ? "Link rotated and copied. The previous link is invalid." : "Payment link copied. Keep it private.");
+      } catch {
+        setManualLink(res.data.paymentLink);
+        setLinkNotice(rotate ? "Link rotated. Copy the private link below; the previous link is invalid." : "Copy the private payment link below.");
+      }
+    } catch (err) {
+      if (err.response?.status === 404) {
+        setLinkNotice("Payment links are not available yet. Try again after the server update.");
+      } else {
+        setLinkNotice("Unable to get a payment link. Please try again.");
+      }
+    } finally {
+      setLinkLoading(null);
     }
   };
 
@@ -158,6 +187,15 @@ export default function AdminDashboard() {
           </div>
         </div>
 
+        {linkNotice && (
+          <div role="status" style={{ marginBottom: 16, color: "var(--text2)" }}>
+            <p>{linkNotice}</p>
+            {manualLink && (
+              <input aria-label="Private payment link" readOnly value={manualLink} onFocus={e => e.target.select()} style={{ width: "100%", marginTop: 8 }} />
+            )}
+          </div>
+        )}
+
         {loading ? (
           <div style={s.empty}>Loading…</div>
         ) : shown.length === 0 ? (
@@ -176,6 +214,8 @@ export default function AdminDashboard() {
                 actionLoading={actionLoading === order._id}
                 onApprove={() => { setModal(order); setPrice(""); }}
                 onStatusChange={changeStatus}
+                onPaymentLink={copyPaymentLink}
+                linkLoading={linkLoading === order._id}
               />
             ))}
           </div>
@@ -247,7 +287,7 @@ export default function AdminDashboard() {
 }
 
 /* ── Order Card ── */
-function OrderCard({ order, onApprove, onStatusChange, actionLoading }) {
+function OrderCard({ order, onApprove, onStatusChange, actionLoading, onPaymentLink, linkLoading }) {
   const sc = STATUS[order.status] || {};
   const date = new Date(order.createdAt).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
 
@@ -286,6 +326,12 @@ function OrderCard({ order, onApprove, onStatusChange, actionLoading }) {
       <div style={s.cardFoot}>
         <span style={s.orderIdBadge}>{order.orderId}</span>
         <div style={s.actions}>
+          <ActionBtn color="var(--text2)" bg="var(--bg3)" onClick={() => onPaymentLink(order._id)} loading={linkLoading}>
+            Copy payment link
+          </ActionBtn>
+          <ActionBtn color="var(--text2)" bg="var(--bg3)" onClick={() => onPaymentLink(order._id, true)} loading={linkLoading}>
+            Rotate link
+          </ActionBtn>
           {order.status === "Pending Approval" && (
             <ActionBtn color="var(--orange)" bg="var(--orange-light)" onClick={onApprove} loading={actionLoading}>
               Approve & Set Price →

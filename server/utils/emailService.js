@@ -1,4 +1,5 @@
 require("dotenv").config();
+const { buildPaymentLink } = require("../config/customerPortal");
 
 // Render blocks outbound SMTP, so we send via Brevo's HTTPS API instead of Gmail SMTP.
 const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
@@ -7,6 +8,7 @@ const sendApprovalEmail = async (order) => {
   const total = Number(order.price);
   const dp = (total * 0.5).toLocaleString("en-PH", { minimumFractionDigits: 2 });
   const totalFmt = total.toLocaleString("en-PH", { minimumFractionDigits: 2 });
+  const paymentLink = buildPaymentLink(order.orderId, order.accessToken);
 
   const html = `
 <!DOCTYPE html>
@@ -57,7 +59,7 @@ const sendApprovalEmail = async (order) => {
 
     <!-- FB instructions -->
     <p style="font-size:16px;line-height:1.8;color:#1d1d1f;margin:0 0 16px;">
-      After sending your payment, please upload the receipt to the website or message us on our <a href="${process.env.FB_PAGE}" style="color:#0071e3;text-decoration:none;font-weight:600;">Facebook page</a> along with this message format:
+      After sending your payment, please upload the receipt using your <a href="${paymentLink}" style="color:#0071e3;text-decoration:none;font-weight:600;">private payment link</a>. Keep this link private. You can also message us on our <a href="${process.env.FB_PAGE}" style="color:#0071e3;text-decoration:none;font-weight:600;">Facebook page</a> along with this message format:
     </p>
 
     <div style="background:#fff8e7;border-left:4px solid #ff9f0a;border-radius:0 10px 10px 0;padding:18px 20px;margin-bottom:28px;font-family:'Courier New',monospace;font-size:14px;line-height:2;color:#1d1d1f;">

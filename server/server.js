@@ -1,6 +1,8 @@
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
+const { getCustomerPortalUrl } = require("./config/customerPortal");
+getCustomerPortalUrl();
 const connectDB = require("./config/db");
 const orderRoutes = require("./routes/orderRoutes");
 const adminRoutes = require("./routes/adminRoutes");
@@ -20,6 +22,7 @@ const allowedOrigins = (process.env.CLIENT_URL || "")
 app.use(
   cors({
     origin: allowedOrigins.length ? allowedOrigins : true,
+    allowedHeaders: ["Content-Type", "Authorization", "X-Order-Access-Token"],
   })
 );
 app.use(express.json());

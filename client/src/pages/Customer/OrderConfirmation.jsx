@@ -1,6 +1,7 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import ThemeToggle from "../../ThemeToggle";
 import { Check, Mail } from "lucide-react";
+import { createPaymentPath } from "../../paymentAccess";
 
 export default function OrderConfirmation() {
   const nav = useNavigate();
@@ -32,7 +33,7 @@ export default function OrderConfirmation() {
               <div style={s.dot} />
               <div>
                 <p style={s.nHead}>{n.head}</p>
-                <p style={s.nBody}>{n.body}</p>
+                <p style={s.nBody}>{!order.accessToken && n.legacyBody ? n.legacyBody : n.body}</p>
               </div>
             </div>
           ))}
@@ -44,9 +45,11 @@ export default function OrderConfirmation() {
         </p>
 
         <button style={s.btn} onClick={() => nav("/")}>Back to Home</button>
-        <button style={s.payLink} onClick={() => nav(`/pay/${order.orderId}`)}>
-          Already received your quote? Submit payment →
-        </button>
+        {order.accessToken && (
+          <button style={s.payLink} onClick={() => nav(createPaymentPath(order.orderId, order.accessToken))}>
+            Already received your quote? Submit payment →
+          </button>
+        )}
       </div>
     </div>
   );
@@ -55,7 +58,7 @@ export default function OrderConfirmation() {
 const NEXT = [
   { head: "Order Review", body: "Our team checks your order details and prepares a quote." },
   { head: "Email Quote", body: "You'll receive an email with the total price and payment options." },
-  { head: "Send Downpayment", body: "Pay 50% via GCash or BPI and send receipt to our Facebook page." },
+  { head: "Send Downpayment", body: "Pay 50% via GCash or BPI and upload your receipt using the private payment link in your quote email.", legacyBody: "Pay 50% via GCash or BPI and send receipt to our Facebook page." },
   { head: "We Print", body: "Production begins immediately after downpayment is confirmed." },
   { head: "Pickup & Final Payment", body: "Pay the remaining 50% when your order is ready." },
 ];

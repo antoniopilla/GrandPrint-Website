@@ -1,9 +1,13 @@
-import { useState, useEffect, useCallback } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import axios from "axios";
 import { API } from "../../config";
 import ThemeToggle from "../../ThemeToggle";
 import { Check, Upload } from "lucide-react";
+import { capturePaymentToken, forgetPaymentToken } from "../../paymentAccess";
+
+const CONTACT_URL = "https://www.messenger.com/t/61551691632716";
+const INVALID_LINK = "This payment link is invalid or outdated. Please contact GrandPrint";
 
 const peso = (n) =>
   `₱${Number(n || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}`;
@@ -11,40 +15,59 @@ const peso = (n) =>
 export default function SendPayment() {
   const nav = useNavigate();
   const { orderId: paramOrderId } = useParams();
+  const location = useLocation();
 
-  const [orderId, setOrderId] = useState(paramOrderId || "");
+  const [accessToken, setAccessToken] = useState("");
   const [file, setFile] = useState(null);
   const [order, setOrder] = useState(null);
-  const [notFound, setNotFound] = useState(false);
+  const [invalidLink, setInvalidLink] = useState(false);
+  const [lookupError, setLookupError] = useState("");
   const [looking, setLooking] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [submitted, setSubmitted] = useState(false);
 
-  const fetchOrder = useCallback(async (id) => {
-    const lookupId = (id ?? orderId).trim();
-    if (!lookupId) return;
-    setLooking(true);
-    setNotFound(false);
-    setSubmitError("");
-    try {
-      const res = await axios.get(`${API}/api/orders/lookup/${lookupId}`);
-      setOrder(res.data);
-    } catch (err) {
-      setOrder(null);
-      setNotFound(true);
-    } finally {
-      setLooking(false);
-    }
-  }, [orderId]);
-
-  // Auto-look up when arriving via /pay/:orderId
   useEffect(() => {
-    if (paramOrderId) fetchOrder(paramOrderId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paramOrderId]);
+    let active = true;
+    setOrder(null);
+    setFile(null);
+    setSubmitted(false);
+    setInvalidLink(false);
+    setLookupError("");
+    setSubmitError("");
+    const { token, hasFragmentToken } = capturePaymentToken(paramOrderId, location.hash);
+    if (hasFragmentToken) {
+      window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
+    }
+    setAccessToken(token);
+    if (!paramOrderId || !token) {
+      setInvalidLink(true);
+      setLooking(false);
+      return () => { active = false; };
+    }
+
+    setLooking(true);
+    axios.get(`${API}/api/orders/lookup/${encodeURIComponent(paramOrderId)}`, {
+      headers: { "X-Order-Access-Token": token },
+    }).then((res) => {
+      if (active) setOrder(res.data);
+    }).catch((err) => {
+      if (!active) return;
+      if (err.response?.status === 404 || err.response?.status === 401 || err.response?.status === 403) {
+        forgetPaymentToken(paramOrderId);
+        setAccessToken("");
+        setInvalidLink(true);
+      } else {
+        setLookupError("Unable to load your payment link. Please try again later.");
+      }
+    }).finally(() => {
+      if (active) setLooking(false);
+    });
+    return () => { active = false; };
+  }, [paramOrderId, location.hash]);
 
   const submitPayment = async () => {
+    if (!order || !accessToken || looking) return;
     if (!file) return alert("Please upload your payment receipt first.");
     setSubmitting(true);
     setSubmitError("");
@@ -52,14 +75,22 @@ export default function SendPayment() {
     formData.append("paymentProof", file);
 
     try {
-      await axios.patch(`${API}/api/customers/pay/${order.orderId}`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
+      await axios.patch(`${API}/api/customers/pay/${encodeURIComponent(order.orderId)}`, formData, {
+        headers: { "Content-Type": "multipart/form-data", "X-Order-Access-Token": accessToken },
       });
       setSubmitted(true);
     } catch (err) {
-      setSubmitError(
-        err.response?.data?.message || "Failed to submit payment. Please try again."
-      );
+      if (err.response?.status === 404 || err.response?.status === 401 || err.response?.status === 403) {
+        forgetPaymentToken(order.orderId);
+        setAccessToken("");
+        setOrder(null);
+        setFile(null);
+        setInvalidLink(true);
+      } else {
+        setSubmitError(
+          err.response?.data?.message || "Failed to submit payment. Please try again."
+        );
+      }
     } finally {
       setSubmitting(false);
     }
@@ -98,37 +129,26 @@ export default function SendPayment() {
               <p style={s.eyebrow}>Send Payment</p>
               <h1 style={s.title}>Submit your downpayment receipt</h1>
               <p style={s.sub}>
-                Enter your Order ID to pull up your order, then upload a
+                Open the private payment link from your quote email, then upload a
                 screenshot of your GCash or BPI payment.
               </p>
 
-              {/* Lookup */}
-              <div style={s.lookupRow}>
-                <input
-                  style={s.input}
-                  placeholder="e.g. GP-123456"
-                  value={orderId}
-                  onChange={(e) => setOrderId(e.target.value.toUpperCase().replace(/\s/g, ""))}
-                  onKeyDown={(e) => e.key === "Enter" && fetchOrder()}
-                />
-                <button
-                  style={{ ...s.checkBtn, opacity: looking || !orderId.trim() ? 0.5 : 1 }}
-                  onClick={() => fetchOrder()}
-                  disabled={looking || !orderId.trim()}
-                >
-                  {looking ? "Checking…" : "Check Order"}
-                </button>
-              </div>
-
-              {notFound && (
-                <p style={s.errorNote}>Order not found. Please double-check your Order ID.</p>
+              {looking && <p style={s.statusNote}>Checking payment link…</p>}
+              {invalidLink && (
+                <div style={s.statusNote}>
+                  <p>{INVALID_LINK}</p>
+                  <a href={CONTACT_URL} target="_blank" rel="noopener noreferrer" style={s.contactLink}>
+                    Chat with GrandPrint on Messenger
+                  </a>
+                </div>
               )}
+              {lookupError && <p style={s.errorNote}>{lookupError}</p>}
 
               {order && (
                 <div style={s.orderBox}>
                   <div style={s.orderHead}>
                     <div>
-                      <p style={s.orderName}>{order.customerName}</p>
+                      <p style={s.orderName}>Order details</p>
                       <p style={s.orderMeta}>
                         {order.productType}
                         {order.width && order.height ? ` · ${order.width}' × ${order.height}'` : ""}
@@ -166,9 +186,9 @@ export default function SendPayment() {
                       </label>
 
                       <button
-                        style={{ ...s.primaryBtn, opacity: submitting || !file ? 0.5 : 1 }}
+                        style={{ ...s.primaryBtn, opacity: submitting || looking || !file ? 0.5 : 1 }}
                         onClick={submitPayment}
-                        disabled={submitting || !file}
+                        disabled={submitting || looking || !file}
                       >
                         {submitting ? "Submitting…" : "Submit Payment"}
                       </button>
@@ -201,9 +221,7 @@ const s = {
   eyebrow: { fontSize: 12, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--blue)", marginBottom: 12 },
   title: { fontSize: 26, fontWeight: 800, letterSpacing: "-0.025em", lineHeight: 1.15, marginBottom: 10 },
   sub: { fontSize: 15, color: "var(--text2)", lineHeight: 1.65, marginBottom: 28 },
-  lookupRow: { display: "flex", gap: 10 },
-  input: { flex: 1, background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: "var(--r-sm)", padding: "13px 16px", fontSize: 15, color: "var(--text)", outline: "none" },
-  checkBtn: { background: "var(--ink)", color: "var(--ink-text)", border: "none", borderRadius: "var(--r-sm)", padding: "0 20px", fontSize: 14, fontWeight: 600, whiteSpace: "nowrap" },
+  contactLink: { display: "inline-block", marginTop: 12, color: "var(--blue)", fontWeight: 600 },
   errorNote: { color: "var(--red)", fontSize: 13, marginTop: 12, lineHeight: 1.5 },
   orderBox: { marginTop: 24, background: "var(--bg2)", borderRadius: "var(--r)", padding: "22px" },
   orderHead: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 16 },

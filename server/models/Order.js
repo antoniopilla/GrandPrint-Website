@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const orderSchema = new mongoose.Schema(
   {
     orderId: { type: String, required: true, unique: true },
+    accessToken: { type: String, select: false },
     customerName: { type: String, required: true },
     email: { type: String, required: true },
     contactNumber: { type: String, required: true },
@@ -31,7 +32,21 @@ const orderSchema = new mongoose.Schema(
       ],
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    toJSON: {
+      transform: (_doc, ret) => {
+        delete ret.accessToken;
+        return ret;
+      },
+    },
+    toObject: {
+      transform: (_doc, ret) => {
+        delete ret.accessToken;
+        return ret;
+      },
+    },
+  }
 );
 
 module.exports = mongoose.model("Order", orderSchema);
