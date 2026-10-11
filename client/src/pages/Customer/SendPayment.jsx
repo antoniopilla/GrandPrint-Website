@@ -309,8 +309,8 @@ const s = {
   fileLabel: { display: "block", cursor: "pointer" },
   fileBtn: { display: "block", width: "100%", minWidth: 0, background: "var(--bg)", border: "1px dashed var(--border)", borderRadius: "var(--r-sm)", padding: "14px 16px", fontSize: 14, fontWeight: 500, color: "var(--text2)", textAlign: "center", overflowWrap: "anywhere", cursor: "pointer" },
   retryBtn: { background: "var(--bg)", color: "var(--blue)", border: "1px solid var(--border)", borderRadius: "var(--r-sm)", padding: "8px 16px", marginTop: 10, fontSize: 14, fontWeight: 600 },
-  primaryBtn: { background: "var(--blue)", color: "#fff", border: "none", borderRadius: 980, padding: "14px", fontSize: 15, fontWeight: 600, width: "100%", transition: "opacity .15s" },
+  primaryBtn: { background: "var(--blue-button)", color: "#fff", border: "none", borderRadius: 980, padding: "14px", fontSize: 15, fontWeight: 600, width: "100%", transition: "opacity .15s" },
   statusNote: { fontSize: 14, color: "var(--text2)", lineHeight: 1.6, background: "var(--bg)", borderRadius: "var(--r-sm)", padding: "14px 16px" },
   doneBox: { textAlign: "center" },
-  check: { width: 60, height: 60, background: "var(--green)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, color: "#fff", fontWeight: 700, margin: "0 auto 24px" },
+  check: { width: 60, height: 60, background: "var(--green)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, color: "var(--green-contrast)", fontWeight: 700, margin: "0 auto 24px" },
 };

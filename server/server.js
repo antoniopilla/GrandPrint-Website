@@ -23,14 +23,9 @@ const startServer = async () => {
 
   // CORS: restrict to the allowed origins from CLIENT_URL (comma-separated).
   // When unset (local dev), allow all origins.
-  const allowedOrigins = (process.env.CLIENT_URL || "")
-    .split(",")
-    .map((o) => o.trim())
-    .filter(Boolean);
-
   app.use(
     cors({
-      origin: allowedOrigins.length ? allowedOrigins : true,
+      origin: config.allowedOrigins.length ? config.allowedOrigins : true,
       allowedHeaders: ["Content-Type", "Authorization", "X-Order-Access-Token"],
     })
   );

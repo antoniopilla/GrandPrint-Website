@@ -17,6 +17,10 @@ const statusConflict = (res) => res.status(409).json({
   code: "INVALID_TRANSITION",
   message: "Order status has changed or this transition is not allowed. Please refresh and try again.",
 });
+const invalidResendPrice = (res) => res.status(400).json({
+  code: "EMAIL_INVALID_PRICE",
+  message: "Cannot resend: this order has a missing or invalid price.",
+});
 
 const provisionAccessToken = async (id) => {
   const order = await Order.findById(id).select("+accessToken");
@@ -146,12 +150,21 @@ exports.getOrderAccessLink = async (req, res) => {
 // POST /api/orders/:id/access-link/rotate — invalidate the previous private link
 exports.rotateOrderAccessLink = async (req, res) => {
   try {
-    const order = await Order.findByIdAndUpdate(
-      req.params.id,
+    const order = await Order.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        $nor: [{ "approvalEmail.state": "sending", "approvalEmail.leaseExpiresAt": { $gt: new Date() } }],
+      },
       { $set: { accessToken: generateAccessToken() } },
       { new: true }
     ).select("+accessToken");
-    if (!order) return res.status(404).json({ message: "Order not found" });
+    if (!order) {
+      if (!await Order.exists({ _id: req.params.id })) return res.status(404).json({ message: "Order not found" });
+      return res.status(409).json({
+        code: "LINK_ROTATION_IN_PROGRESS",
+        message: "Cannot rotate: an approval email is being sent. Please wait and refresh.",
+      });
+    }
     res.json({ orderId: order.orderId, paymentLink: buildPaymentLink(order.orderId, order.accessToken) });
   } catch (err) {
     sendApiError(res, err, "Unable to rotate payment link", "rotateOrderAccessLink");
@@ -234,6 +247,7 @@ exports.resendApprovalEmail = async (req, res) => {
     if (typeof order.email !== "string" || order.email.trim().length > 254 || !isValidEmail(order.email.trim())) {
       return res.status(400).json({ code: "EMAIL_INVALID_RECIPIENT", message: "Cannot resend: this order has a missing or invalid email address." });
     }
+    if (!isValidPrice(order.price)) return invalidResendPrice(res);
 
     const now = Date.now();
     const state = getApprovalEmailState(order, now);
@@ -251,7 +265,7 @@ exports.resendApprovalEmail = async (req, res) => {
 
     const accessOrder = await provisionAccessToken(order._id);
     if (!accessOrder) return res.status(404).json({ message: "Order not found" });
-    const filter = { _id: req.params.id, status: "Awaiting Downpayment", email: order.email };
+    const filter = { _id: req.params.id, status: "Awaiting Downpayment", email: order.email, price: order.price };
     if (order.approvalEmail) {
       filter["approvalEmail.attemptId"] = order.approvalEmail.attemptId;
       filter["approvalEmail.state"] = order.approvalEmail.state;
@@ -265,7 +279,9 @@ exports.resendApprovalEmail = async (req, res) => {
       { new: true, runValidators: true }
     ).select("+accessToken +approvalEmail");
     if (!claimedOrder) {
-      if (!await Order.exists({ _id: req.params.id })) return res.status(404).json({ message: "Order not found" });
+      const currentOrder = await Order.findById(req.params.id);
+      if (!currentOrder) return res.status(404).json({ message: "Order not found" });
+      if (!isValidPrice(currentOrder.price)) return invalidResendPrice(res);
       return res.status(409).json({ code: "EMAIL_IN_PROGRESS", message: "An approval email is already being sent. Please wait and refresh." });
     }
     res.status(202).json({ order: serializeAdminOrder(claimedOrder) });

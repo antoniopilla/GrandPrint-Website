@@ -77,6 +77,6 @@ const s = {
   sub: { fontSize: 14, color: "var(--text2)", marginBottom: 28, lineHeight: 1.5 },
   input: { background: "var(--bg2)", border: "1.5px solid transparent", borderRadius: "var(--r-sm)", padding: "13px 16px", fontSize: 16, color: "var(--text)", outline: "none", width: "100%", minWidth: 0, textAlign: "center", letterSpacing: "0.08em", marginBottom: 8, fontFamily: "var(--font)", transition: "border-color .15s" },
   error: { color: "var(--red)", fontSize: 13, marginBottom: 12 },
-  btn: { background: "var(--blue)", color: "#fff", border: "none", borderRadius: 980, padding: "13px 0", fontSize: 15, fontWeight: 600, width: "100%", marginBottom: 14, transition: "opacity .15s", fontFamily: "var(--font)" },
+  btn: { background: "var(--blue-button)", color: "#fff", border: "none", borderRadius: 980, padding: "13px 0", fontSize: 15, fontWeight: 600, width: "100%", marginBottom: 14, transition: "opacity .15s", fontFamily: "var(--font)" },
   back: { background: "none", border: "none", color: "var(--text3)", fontSize: 14, fontWeight: 500, fontFamily: "var(--font)" },
 };

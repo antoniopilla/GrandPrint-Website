@@ -1,6 +1,6 @@
 require("dotenv").config();
 const { buildPaymentLink, getCustomerPortalUrl } = require("../config/customerPortal");
-const { isValidEmail } = require("./orderValidation");
+const { isValidEmail, isValidPrice } = require("./orderValidation");
 
 // Render blocks outbound SMTP, so we send via Brevo's HTTPS API instead of Gmail SMTP.
 const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
@@ -35,8 +35,9 @@ const sendApprovalEmail = async (order) => {
   if (typeof order?.email !== "string" || order.email.trim().length > 254 || !isValidEmail(order.email.trim())) {
     throw emailError("EMAIL_INVALID_RECIPIENT", "Order has no valid recipient email.");
   }
+  if (!isValidPrice(order.price)) throw emailError("EMAIL_INVALID_PRICE", "Order has no valid price.");
   validateEmailSettings();
-  const total = Number(order.price);
+  const total = order.price;
   const dp = (total * 0.5).toLocaleString("en-PH", { minimumFractionDigits: 2 });
   const totalFmt = total.toLocaleString("en-PH", { minimumFractionDigits: 2 });
   const paymentLink = buildPaymentLink(order.orderId, order.accessToken);

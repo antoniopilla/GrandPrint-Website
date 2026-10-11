@@ -48,30 +48,43 @@ export default function AdminDashboard() {
   const priceRef = useRef(null);
   const approvalTriggerRef = useRef(null);
   const refreshButtonRef = useRef(null);
+  const listRequestSequenceRef = useRef(0);
+  const listApiRef = useRef(null);
   const isModalOpen = Boolean(modal);
 
   const fetchOrders = useCallback(async () => {
+    if (listApiRef.current !== adminApi) return;
+    const requestSequence = ++listRequestSequenceRef.current;
+    const isCurrentRequest = () => listRequestSequenceRef.current === requestSequence && listApiRef.current === adminApi;
     setRefreshing(true);
     try {
       const res = await adminApi.get("/api/orders");
+      if (!isCurrentRequest()) return;
       if (!Array.isArray(res.data)) throw new Error("Invalid orders response");
       setOrders(res.data);
       setHasLoadedOrders(true);
       setListError("");
     } catch (err) {
-      if (err.response?.status === 401) return;
+      if (!isCurrentRequest() || err.response?.status === 401) return;
       setListError("Unable to load orders. Please try again.");
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (isCurrentRequest()) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, [adminApi]);
 
   useEffect(() => {
+    listApiRef.current = adminApi;
     fetchOrders();
     const iv = setInterval(fetchOrders, 20000);
-    return () => clearInterval(iv);
-  }, [fetchOrders]);
+    return () => {
+      clearInterval(iv);
+      listApiRef.current = null;
+      listRequestSequenceRef.current += 1;
+    };
+  }, [adminApi, fetchOrders]);
 
   useEffect(() => {
     if (!isModalOpen) return;
@@ -188,7 +201,7 @@ export default function AdminDashboard() {
       if (err.response?.status === 404) {
         setLinkNotice("Payment links are not available yet. Try again after the server update.");
       } else {
-        setLinkNotice("Unable to get a payment link. Please try again.");
+        setLinkNotice(getApiErrorMessage(err, "Unable to get a payment link. Please try again."));
       }
     } finally {
       setLinkLoading(null);
@@ -608,7 +621,7 @@ const s = {
   bRowTotal: { borderTop: "1px solid var(--border)", paddingTop: 10, marginTop: 4, fontSize: 15, fontWeight: 700, color: "var(--text)" },
   modalBtns: { display: "flex", gap: 10, flexWrap: "wrap" },
   cancelBtn: { flex: 1, background: "var(--bg2)", border: "none", borderRadius: 980, padding: "12px", fontSize: 14, fontWeight: 600, color: "var(--text2)", cursor: "pointer", fontFamily: "var(--font)" },
-  approveBtn: { flex: 2, background: "var(--blue)", color: "#fff", border: "none", borderRadius: 980, padding: "12px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font)", transition: "opacity .15s", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 },
+  approveBtn: { flex: 2, background: "var(--blue-button)", color: "#fff", border: "none", borderRadius: 980, padding: "12px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font)", transition: "opacity .15s", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 },
 
   // ── Responsive (mobile ≤640px): sidebar becomes a top bar ──
   rootMobile: { flexDirection: "column" },

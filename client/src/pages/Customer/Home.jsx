@@ -99,8 +99,8 @@ export default function Home() {
         style={s.fab}
         title="Chat on Messenger"
         aria-label="Chat on Messenger"
-        onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.05)"; e.currentTarget.style.background = "var(--blue-hover)"; }}
-        onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.background = "var(--blue)"; }}
+        onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.05)"; e.currentTarget.style.background = "var(--blue-button-hover)"; }}
+        onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.background = "var(--blue-button)"; }}
       >
         <MessageCircle size={20} /> Chat with us
       </a>
@@ -117,7 +117,7 @@ function Btn({ children, primary, large, onClick }) {
     fontSize: large ? 17 : 15,
   };
   const variant = primary
-    ? { background: "var(--blue)", color: "#fff" }
+    ? { background: "var(--blue-button)", color: "#fff" }
     : { background: "var(--bg3)", color: "var(--text)" };
 
   return (
@@ -126,11 +126,11 @@ function Btn({ children, primary, large, onClick }) {
       onClick={onClick}
       onMouseEnter={e => {
         e.currentTarget.style.transform = "scale(1.03)";
-        if (primary) e.currentTarget.style.background = "var(--blue-hover)";
+        if (primary) e.currentTarget.style.background = "var(--blue-button-hover)";
       }}
       onMouseLeave={e => {
         e.currentTarget.style.transform = "scale(1)";
-        if (primary) e.currentTarget.style.background = "var(--blue)";
+        if (primary) e.currentTarget.style.background = "var(--blue-button)";
       }}
     >
       {children}
@@ -182,6 +182,6 @@ const s = {
   bannerInner: { maxWidth: 500, margin: "0 auto" },
   bannerTitle: { fontSize: "clamp(28px,4vw,40px)", fontWeight: 800, color: "#fff", letterSpacing: "-0.025em", marginBottom: 12 },
   bannerSub: { fontSize: 16, color: "rgba(255,255,255,0.6)", marginBottom: 32 },
-  fab: { position: "fixed", bottom: 24, right: 24, zIndex: 1000, display: "inline-flex", alignItems: "center", gap: 10, background: "var(--blue)", color: "#fff", borderRadius: 980, padding: "14px 22px", fontSize: 15, fontWeight: 600, boxShadow: "0 6px 20px rgba(0,0,0,0.25)", textDecoration: "none", fontFamily: "var(--font)", transition: "all 0.18s", cursor: "pointer" },
+  fab: { position: "fixed", bottom: 24, right: 24, zIndex: 1000, display: "inline-flex", alignItems: "center", gap: 10, background: "var(--blue-button)", color: "#fff", borderRadius: 980, padding: "14px 22px", fontSize: 15, fontWeight: 600, boxShadow: "0 6px 20px rgba(0,0,0,0.25)", textDecoration: "none", fontFamily: "var(--font)", transition: "all 0.18s", cursor: "pointer" },
   footer: { padding: "24px clamp(20px,5vw,32px)", textAlign: "center", fontSize: 13, color: "var(--text3)", borderTop: "1px solid var(--border)" },
 };

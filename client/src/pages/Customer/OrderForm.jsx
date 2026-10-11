@@ -460,5 +460,5 @@ const s = {
   divider: { height: 1, background: "var(--border)", margin: "16px 0" },
   notice: { display: "flex", gap: 10, alignItems: "flex-start", background: "var(--orange-light)", borderRadius: "var(--r-sm)", padding: "14px 16px", marginBottom: 28 },
   btnRow: { marginTop: 24, display: "flex", justifyContent: "flex-end" },
-  btnPrimary: { background: "var(--blue)", color: "#fff", border: "none", borderRadius: 980, padding: "13px 28px", fontSize: 15, fontWeight: 600, transition: "all .15s" },
+  btnPrimary: { background: "var(--blue-button)", color: "#fff", border: "none", borderRadius: 980, padding: "13px 28px", fontSize: 15, fontWeight: 600, transition: "all .15s" },
 };
