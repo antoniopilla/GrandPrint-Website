@@ -17,7 +17,13 @@ const {
 // Files are kept in memory then streamed to Cloudinary in the controller.
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 20 * 1024 * 1024 },
+  limits: {
+    fileSize: 20 * 1024 * 1024,
+    files: 1,
+    fields: 8,
+    parts: 10,
+    fieldSize: 64 * 1024,
+  },
 });
 
 router.get("/", requireAdmin, getOrders);

@@ -9,7 +9,13 @@ const { paymentRateLimit } = require("../middleware/orderAccessRateLimit");
 // Payment proof is held in memory then streamed to Cloudinary below.
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 20 * 1024 * 1024 },
+  limits: {
+    fileSize: 20 * 1024 * 1024,
+    files: 1,
+    fields: 0,
+    parts: 2,
+    fieldSize: 64 * 1024,
+  },
 });
 
 // PATCH route to submit payment proof
