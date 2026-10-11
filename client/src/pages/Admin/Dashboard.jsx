@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { API } from "../../config";
 import { getApiErrorMessage } from "../../apiErrors";
+import { getApprovalEmailInfo, isValidApprovalEmail } from "../../approvalEmail";
 import ThemeToggle from "../../ThemeToggle";
 import { useIsMobile } from "../../useMediaQuery";
 import { TriangleAlert, RefreshCw, Inbox, Printer, CircleCheck, Check } from "lucide-react";
@@ -39,6 +40,8 @@ export default function AdminDashboard() {
   const [linkLoading, setLinkLoading] = useState(null);
   const [linkNotice, setLinkNotice] = useState("");
   const [manualLink, setManualLink] = useState("");
+  const [emailLoading, setEmailLoading] = useState(null);
+  const [emailNotice, setEmailNotice] = useState("");
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -123,6 +126,34 @@ export default function AdminDashboard() {
     }
   };
 
+  const resendApprovalEmail = async (order) => {
+    if (!isValidApprovalEmail(order.email)) {
+      setEmailNotice("Cannot resend: this order has a missing or invalid email address.");
+      return;
+    }
+    const emailInfo = getApprovalEmailInfo(order);
+    if (emailInfo?.isSending || emailLoading === order._id) {
+      setEmailNotice("An approval email is already being sent. Please wait and refresh.");
+      return;
+    }
+    const confirmDuplicate = Boolean(emailInfo?.requiresConfirmation);
+    if (confirmDuplicate && !window.confirm("This approval email may already have been accepted by the email provider. Sending it again could create a duplicate email. Resend anyway?")) return;
+    setEmailLoading(order._id);
+    setEmailNotice("");
+    try {
+      await axios.post(`${API}/api/orders/${order._id}/approval-email/resend`, { confirmDuplicate }, authHeaders());
+      setEmailNotice("Approval email send started. Refresh to check its status.");
+      await fetchOrders();
+    } catch (err) {
+      if (err.response?.status === 409) await fetchOrders();
+      setEmailNotice(err.response?.status === 404
+        ? "Email resend is not available yet. Try again after the server update."
+        : getApiErrorMessage(err, "Unable to resend the approval email. Please try again."));
+    } finally {
+      setEmailLoading(null);
+    }
+  };
+
   const currentTab = TABS.find(t => t.key === tab);
   const shown = orders.filter(o => currentTab.statuses.includes(o.status));
   const counts = Object.fromEntries(TABS.map(t => [t.key, orders.filter(o => t.statuses.includes(o.status)).length]));
@@ -199,6 +230,10 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {emailNotice && (
+          <p role="status" style={{ marginBottom: 16, color: "var(--text2)" }}>{emailNotice}</p>
+        )}
+
         {loading ? (
           <div style={s.empty}>Loading…</div>
         ) : shown.length === 0 ? (
@@ -219,6 +254,8 @@ export default function AdminDashboard() {
                 onStatusChange={changeStatus}
                 onPaymentLink={copyPaymentLink}
                 linkLoading={linkLoading === order._id}
+                onResendEmail={resendApprovalEmail}
+                emailLoading={emailLoading === order._id}
               />
             ))}
           </div>
@@ -231,7 +268,7 @@ export default function AdminDashboard() {
           <div style={s.modal} className="au" onClick={e => e.stopPropagation()}>
             <h2 style={s.modalTitle}>Approve & Set Price</h2>
             <p style={s.modalSub}>
-              An email with the quote and payment instructions will be sent automatically to <strong>{modal.email}</strong>.
+              After approval, we’ll try to email the quote and payment instructions to <strong>{modal.email}</strong>. Check the email status in On-Going.
             </p>
 
             <div style={s.modalMeta}>
@@ -279,7 +316,7 @@ export default function AdminDashboard() {
                 onClick={doApprove}
                 disabled={!Number.isFinite(Number(price)) || Number(price) <= 0 || approving}
               >
-                {approving ? "Sending…" : (<><Check size={16} /> Approve &amp; Email Client</>)}
+                {approving ? "Approving…" : (<><Check size={16} /> Approve &amp; Email Client</>)}
               </button>
             </div>
           </div>
@@ -290,9 +327,11 @@ export default function AdminDashboard() {
 }
 
 /* ── Order Card ── */
-function OrderCard({ order, onApprove, onStatusChange, actionLoading, onPaymentLink, linkLoading }) {
+function OrderCard({ order, onApprove, onStatusChange, actionLoading, onPaymentLink, linkLoading, onResendEmail, emailLoading }) {
   const sc = STATUS[order.status] || {};
   const date = new Date(order.createdAt).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
+  const emailInfo = getApprovalEmailInfo(order);
+  const invalidEmail = !isValidApprovalEmail(order.email);
 
   return (
     <div style={s.card}>
@@ -303,6 +342,17 @@ function OrderCard({ order, onApprove, onStatusChange, actionLoading, onPaymentL
         </div>
         <span style={{ ...s.statusPill, background: sc.bg, color: sc.color }}>{sc.label}</span>
       </div>
+
+      {emailInfo && (
+        <p style={{ marginBottom: 14, fontSize: 12, color: "var(--text2)" }}>
+          Approval email: <span style={{ ...s.statusPill, background: "var(--bg3)", color: "var(--text2)", whiteSpace: "normal", display: "inline-block" }}>{emailInfo.label}</span>
+        </p>
+      )}
+      {order.status === "Awaiting Downpayment" && invalidEmail && (
+        <p style={{ marginBottom: 14, fontSize: 12, color: "var(--orange)" }}>
+          Cannot resend: this order has a missing or invalid email address.
+        </p>
+      )}
 
       <div style={s.cardGrid}>
         {[
@@ -351,13 +401,18 @@ function OrderCard({ order, onApprove, onStatusChange, actionLoading, onPaymentL
             </ActionBtn>
           )}
           {order.status === "Awaiting Downpayment" && (
-            <ActionBtn color="var(--blue)" bg="var(--blue-light)" onClick={() => {
-              if (window.confirm("Confirm you have seen and verified the receipt on Messenger?")) {
-                onStatusChange(order._id, "Printing");
-              }
-            }} loading={actionLoading}>
-              Confirm Payment (Messenger) → Start Printing
-            </ActionBtn>
+            <>
+              <ActionBtn color="var(--text2)" bg="var(--bg3)" onClick={() => onResendEmail(order)} loading={emailLoading} disabled={invalidEmail || emailInfo?.isSending}>
+                Resend approval email
+              </ActionBtn>
+              <ActionBtn color="var(--blue)" bg="var(--blue-light)" onClick={() => {
+                if (window.confirm("Confirm you have seen and verified the receipt on Messenger?")) {
+                  onStatusChange(order._id, "Printing");
+                }
+              }} loading={actionLoading}>
+                Confirm Payment (Messenger) → Start Printing
+              </ActionBtn>
+            </>
           )}
           {order.status === "Payment Submitted" && (
             <>
@@ -395,12 +450,12 @@ function OrderCard({ order, onApprove, onStatusChange, actionLoading, onPaymentL
   );
 }
 
-function ActionBtn({ children, color, bg, onClick, loading }) {
+function ActionBtn({ children, color, bg, onClick, loading, disabled = false }) {
   return (
     <button
       onClick={onClick}
-      disabled={loading}
-      style={{ background: bg, color, border: "none", borderRadius: "var(--r-sm)", padding: "9px 16px", fontSize: 13, fontWeight: 600, fontFamily: "var(--font)", opacity: loading ? 0.6 : 1, transition: "opacity .15s", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+      disabled={loading || disabled}
+      style={{ background: bg, color, border: "none", borderRadius: "var(--r-sm)", padding: "9px 16px", fontSize: 13, fontWeight: 600, fontFamily: "var(--font)", opacity: loading || disabled ? 0.6 : 1, transition: "opacity .15s", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}
     >
       {loading ? "…" : children}
     </button>

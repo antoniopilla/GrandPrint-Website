@@ -1,10 +1,11 @@
 const Order = require("../models/Order");
-const sendApprovalEmail = require("../utils/emailService");
 const { uploadBuffer } = require("../config/cloudinary");
 const { generateAccessToken } = require("../utils/orderAccess");
 const { buildPaymentLink } = require("../config/customerPortal");
+const { validateEmailSettings } = require("../utils/emailService");
 const { sendApiError } = require("../utils/apiError");
-const { validateOrderInput, sendValidationErrors, parseNumber, isValidPrice } = require("../utils/orderValidation");
+const { validateOrderInput, sendValidationErrors, parseNumber, isValidPrice, isValidEmail } = require("../utils/orderValidation");
+const { createEmailAttempt, getApprovalEmailState, serializeAdminOrder, dispatchApprovalEmail } = require("../utils/approvalEmail");
 
 const STATUS_PREDECESSORS = {
   Printing: ["Awaiting Downpayment", "Payment Submitted"],
@@ -89,8 +90,8 @@ exports.createOrder = async (req, res) => {
 // GET /api/orders
 exports.getOrders = async (req, res) => {
   try {
-    const orders = await Order.find().sort({ createdAt: -1 });
-    res.json(orders);
+    const orders = await Order.find().select("+approvalEmail").sort({ createdAt: -1 });
+    res.json(orders.map((order) => serializeAdminOrder(order)));
   } catch (err) {
     sendApiError(res, err, "Server Error", "getOrders");
   }
@@ -183,22 +184,72 @@ exports.approveOrder = async (req, res) => {
 
     const approvedOrder = await Order.findOneAndUpdate(
       { _id: req.params.id, status: "Pending Approval" },
-      { $set: { price, status: "Awaiting Downpayment" } },
+      { $set: { price, status: "Awaiting Downpayment", approvalEmail: createEmailAttempt() } },
       { new: true, runValidators: true }
-    ).select("+accessToken");
+    ).select("+accessToken +approvalEmail");
     if (!approvedOrder) {
       if (!await Order.exists({ _id: req.params.id })) return res.status(404).json({ message: "Order not found" });
       return statusConflict(res);
     }
 
-    // Reply immediately — don't make the admin wait on SMTP/email delivery.
-    res.json({ order: approvedOrder });
+    // Reply immediately without waiting for the email provider.
+    res.json({ order: serializeAdminOrder(approvedOrder) });
 
     // Send the approval email in the background; log (don't crash) if it fails.
-    sendApprovalEmail({ ...approvedOrder.toObject(), accessToken: approvedOrder.accessToken }).catch((emailErr) =>
-      console.error("Email failed (order still approved):", emailErr.message)
-    );
+    dispatchApprovalEmail(approvedOrder);
   } catch (err) {
     sendApiError(res, err, "Server error", "approveOrder");
+  }
+};
+
+// POST /api/orders/:id/approval-email/resend — send the current quote again
+exports.resendApprovalEmail = async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id).select("+approvalEmail");
+    if (!order) return res.status(404).json({ message: "Order not found" });
+    if (order.status !== "Awaiting Downpayment") {
+      return res.status(409).json({ code: "EMAIL_RESEND_NOT_ALLOWED", message: "Approval emails can only be resent while awaiting downpayment." });
+    }
+    if (typeof order.email !== "string" || order.email.trim().length > 254 || !isValidEmail(order.email.trim())) {
+      return res.status(400).json({ code: "EMAIL_INVALID_RECIPIENT", message: "Cannot resend: this order has a missing or invalid email address." });
+    }
+
+    const now = Date.now();
+    const state = getApprovalEmailState(order, now);
+    if (state === "sending") {
+      return res.status(409).json({ code: "EMAIL_IN_PROGRESS", message: "An approval email is already being sent. Please wait and refresh." });
+    }
+    if (["accepted", "unknown"].includes(state) && req.body?.confirmDuplicate !== true) {
+      return res.status(409).json({ code: "EMAIL_DUPLICATE_CONFIRMATION", message: "This email may already have been accepted. Confirm before resending." });
+    }
+    try {
+      validateEmailSettings();
+    } catch {
+      return res.status(400).json({ code: "EMAIL_CONFIGURATION", message: "Approval email settings are missing or invalid. Check the email setup on Render." });
+    }
+
+    const accessOrder = await provisionAccessToken(order._id);
+    if (!accessOrder) return res.status(404).json({ message: "Order not found" });
+    const filter = { _id: req.params.id, status: "Awaiting Downpayment", email: order.email };
+    if (order.approvalEmail) {
+      filter["approvalEmail.attemptId"] = order.approvalEmail.attemptId;
+      filter["approvalEmail.state"] = order.approvalEmail.state;
+      if (order.approvalEmail.state === "sending") filter["approvalEmail.leaseExpiresAt"] = { $lte: new Date(now) };
+    } else {
+      filter.$or = [{ approvalEmail: { $exists: false } }, { approvalEmail: null }];
+    }
+    const claimedOrder = await Order.findOneAndUpdate(
+      filter,
+      { $set: { approvalEmail: createEmailAttempt(now) } },
+      { new: true, runValidators: true }
+    ).select("+accessToken +approvalEmail");
+    if (!claimedOrder) {
+      if (!await Order.exists({ _id: req.params.id })) return res.status(404).json({ message: "Order not found" });
+      return res.status(409).json({ code: "EMAIL_IN_PROGRESS", message: "An approval email is already being sent. Please wait and refresh." });
+    }
+    res.status(202).json({ order: serializeAdminOrder(claimedOrder) });
+    dispatchApprovalEmail(claimedOrder);
+  } catch (err) {
+    sendApiError(res, err, "Unable to resend approval email", "resendApprovalEmail");
   }
 };

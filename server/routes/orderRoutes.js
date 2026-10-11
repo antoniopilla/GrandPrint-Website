@@ -12,6 +12,7 @@ const {
   approveOrder,
   getOrderAccessLink,
   rotateOrderAccessLink,
+  resendApprovalEmail,
 } = require("../controllers/orderController");
 
 // Files are kept in memory then streamed to Cloudinary in the controller.
@@ -34,5 +35,6 @@ router.put("/:id/status", requireAdmin, updateOrderStatus);
 router.put("/:id/approve", requireAdmin, approveOrder);
 router.post("/:id/access-link", requireAdmin, getOrderAccessLink);
 router.post("/:id/access-link/rotate", requireAdmin, rotateOrderAccessLink);
+router.post("/:id/approval-email/resend", requireAdmin, resendApprovalEmail);
 
 module.exports = router;
