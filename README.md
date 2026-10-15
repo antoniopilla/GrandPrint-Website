@@ -1,169 +1,277 @@
-# GrandPrint
+<div align="center">
 
-A full-stack order and payment receipt management system for large-format printing businesses.
+# GrandPrint — Large Format Printing Order System
+
+**A full-stack printing platform for customer orders, artwork uploads, manual quotes and payment verification, production tracking, and an admin workspace with order editing, archiving, and deletion.**
+
+[![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)](https://react.dev/)
+[![Vite](https://img.shields.io/badge/Vite-6-646CFF?logo=vite&logoColor=white)](https://vite.dev/)
+[![Node.js](https://img.shields.io/badge/Node.js-Express_4-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![MongoDB](https://img.shields.io/badge/MongoDB-Mongoose-47A248?logo=mongodb&logoColor=white)](https://mongoosejs.com/)
+[![Cloudinary](https://img.shields.io/badge/Media-Cloudinary-3448C5?logo=cloudinary&logoColor=white)](https://cloudinary.com/)
+
+</div>
+
+---
 
 ## Overview
 
-GrandPrint lets customers request Tarpaulin, Sintra Board, and Sticker orders with dimensions, quantities, and optional artwork. Administrators review orders, set prices, verify payment receipts, and manage production through final payment. Customers receive a private payment link after approval; payments and receipt verification are handled manually.
+**GrandPrint** manages made-to-order Tarpaulin, Sintra Board, and Sticker requests. Customers submit their details, dimensions, quantities, notes, and optional artwork. An administrator reviews the request, sets a price, verifies a downpayment receipt, and advances production through completion and final payment.
 
-## Features
+The React client and Express API are separate packages. MongoDB stores orders, Cloudinary stores uploaded files, and Brevo sends approval emails containing the quote and private payment link. GCash and BPI instructions support manual payment collection; there is no payment gateway integration.
 
-**Customer side**
+## Key Features
 
-- Order form with artwork upload and validated customer details, dimensions, and quantities.
-- Private payment links showing the approved quote and downpayment information.
-- Payment receipt upload, with a clear fallback for invalid or outdated links.
-- Artwork formats: PDF, PNG, JPG/JPEG, PSD, AI, and EPS; receipt formats: PDF, PNG, and JPG/JPEG.
+### Customer ordering & payments
 
-**Admin side**
+- **Validated order form** — customer details, product choice, dimensions in feet, quantity, notes, and optional artwork, followed by an order confirmation.
+- **Private payment access** — the quote email and confirmation link open the payment page; an order number alone does not grant access. Invalid or outdated links show a contact fallback.
+- **Receipt submission** — upload a receipt while awaiting downpayment, then wait for admin verification. Customers can also send a receipt through Messenger for manual confirmation.
+- **Responsive presentation** — light/dark themes, file previews, upload feedback, and a floating Messenger contact button on the landing page.
 
-- JWT-protected dashboard for order review, pricing, and lifecycle management.
-- Artwork and receipt viewing, with manual receipt verification before printing.
-- Messenger payment confirmation with an explicit confirmation prompt.
-- Background approval emails, email status tracking, and manual resend while awaiting downpayment.
-- Copy payment link reuses the current token; Rotate payment link invalidates the previous link and is blocked during an active email send.
+### Admin order management
 
-## Order lifecycle
+- **Status-based dashboard** — Pending Approval, On-Going, and Completed tabs, with counts, manual refresh, and 20-second polling.
+- **Order editing** — update contact details and notes on active orders. Product, dimensions, quantity, and artwork replacement are editable only while Pending Approval; approval locks those quote inputs on the API as well as in the editor.
+- **Archive & restore** — separate Active/Archived views preserve order details and files. Archived orders are unavailable through customer lookup and payment upload; restoring re-enables their private links.
+- **Permanent deletion** — available for archived orders after an explicit confirmation. The API attempts to remove artwork and receipt assets from Cloudinary and reports a warning if file cleanup fails.
+- **Quote & production workflow** — approve a price, inspect artwork and receipts, verify payment, mark production complete, and confirm the remaining balance. Messenger verification has its own confirmation prompt.
+- **Approval email tracking** — background sends report Sending, Failed, Unknown, or Accepted by email provider. Guarded resends are available while awaiting downpayment; changing an email address does not send automatically.
+- **Payment-link controls** — copying reuses the existing private token; rotating invalidates the previous link and is blocked during an active approval email send.
 
-Pending Approval → Awaiting Downpayment → Payment Submitted → Printing → Completed → Fully Paid.
+### Validation & access
 
-Admin actions approve and price orders, verify uploaded receipts, mark completion, and confirm final payment; the customer receipt upload enters Payment Submitted. For a receipt verified on Messenger, the admin can move Awaiting Downpayment directly to Printing. Other transitions are blocked.
+- **Admin authentication** — shared-password login issues a 12-hour JWT; the client stores it in `sessionStorage`, and protected API routes verify the token.
+- **Upload validation** — extension, MIME type, file signature, multipart, and size checks precede Cloudinary storage. Artwork accepts PDF, PNG, JPG/JPEG, PSD, AI, and EPS; receipts accept PDF, PNG, and JPG/JPEG.
+- **Order integrity** — new public order numbers use `GP-` plus 16 cryptographically random hexadecimal characters; existing legacy numbers remain usable with their private access tokens. Lifecycle updates use conditional database writes.
+- **Regression coverage** — a Node.js HTTP test harness covers admin editing, quote locks, archive/restore, deletion, upload cleanup, and customer access to archived orders using mocked persistence and media services.
 
-## Tech stack
+## Screenshots
 
-Versions below match the installed packages and committed lockfiles.
+No application screenshots are currently tracked in this repository. To inspect the current UI locally, visit `/` (landing), `/order` (customer form), and `/admin` (authenticated dashboard and editor). The `/pay` page requires a private order link to display a quote. Use disposable orders when capturing payment or admin screens.
 
-| Component | Technology |
-| --- | --- |
-| Client | React / React DOM 18.3.1, Vite 6.4.3, React Router DOM 6.30.3, Axios 1.13.6 |
-| Server | Express 4.22.1, Mongoose 8.23.0 for MongoDB, JSON Web Token 9.0.3 |
-| Uploads | Multer 2.3.0, Cloudinary SDK 2.11.0 |
-| Email | Brevo HTTP API through native Node.js fetch; no email SDK |
-| Deployment | Vercel for the client, Render for the server |
+## Tech Stack
 
-The MongoDB server version is not pinned by this repository.
+| Layer | Technologies |
+|---|---|
+| **Frontend** | React / React DOM 18.3.1, React Router DOM 6.30.3, Vite 6.4.3, Axios 1.13.6, Lucide React, custom CSS and responsive inline styles |
+| **Backend** | Node.js, Express 4.22.1, Mongoose 8.23.0, MongoDB |
+| **Auth & Uploads** | JSON Web Token 9.0.3, Multer 2.3.0, Cloudinary SDK 2.11.0 |
+| **Email** | Brevo HTTPS API through native Node.js `fetch` |
+| **Tooling & Tests** | ESLint 10, Nodemon, Node.js built-in test runner |
+| **Deployment** | Client configured for Vercel; API documented for Render |
 
-## Project structure
+Package versions above come from the committed lockfiles. The MongoDB server version is not pinned.
 
-- `client/` — React application, Vite configuration, and client environment example.
-- `server/` — Express API, MongoDB models, upload handling, email integration, and server environment example.
+## Architecture
 
-## Getting started
+```text
+React SPA (Vercel) ── HTTPS ──▶ Express API (Render) ──▶ MongoDB
+                                     │
+                                     ├─ Cloudinary (artwork and receipts)
+                                     └─ Brevo (quotes and payment instructions)
+```
+
+Customer order creation is public. Customer lookup and receipt submission require an `X-Order-Access-Token`; the private link carries the token in its URL fragment, which the client captures and removes from the address bar. Admin requests use a Bearer JWT. The API validates order details and upload contents before persistence and enforces the production lifecycle.
+
+<details>
+<summary><strong>Project structure</strong></summary>
+
+```text
+GrandPrint-Website/
+├── client/
+│   ├── public/                  # Static assets
+│   ├── src/
+│   │   ├── pages/Customer/       # Landing, order form, confirmation, payment
+│   │   ├── pages/Admin/          # Login, dashboard, order editor
+│   │   ├── adminApi.js           # Authenticated order management requests
+│   │   ├── orderValidation.js    # Shared customer/editor field validation
+│   │   ├── paymentAccess.js      # Private-link token capture and session storage
+│   │   ├── ThemeToggle.jsx       # Light/dark preference
+│   │   └── App.jsx               # Routes and client admin guard
+│   ├── .env.example
+│   ├── vite.config.js            # Dev port and build-time API URL validation
+│   └── vercel.json               # SPA rewrites
+├── server/
+│   ├── config/                  # Startup validation, MongoDB, Cloudinary, portal URL
+│   ├── controllers/             # Order creation, lifecycle, email and admin CRUD
+│   ├── middleware/              # Auth, upload validation, optional IP limiters
+│   ├── models/                  # Mongoose Order schema and indexes
+│   ├── routes/                  # Orders, customers, admin login
+│   ├── utils/                   # Validation, email delivery, private access, API errors
+│   ├── tests/                   # Mocked admin order API regression tests
+│   ├── .env.example
+│   └── server.js                 # Connect MongoDB, then start the API
+└── docs/admin-order-crud-testing.md
+```
+
+</details>
+
+## API Overview
+
+| Mount | Purpose | Access |
+|---|---|---|
+| `/api/admin/login` | Shared-password admin login | Public |
+| `/api/orders` | Create an order; list active orders or `?archived=true` | Public create / Admin list |
+| `/api/orders/lookup/:orderId` | Retrieve a customer's quote and status | Private order token |
+| `/api/customers/pay/:orderId` | Submit a downpayment receipt | Private order token |
+| `/api/orders/:id` | Edit order details (`PUT`); permanently delete an archived order (`DELETE`) | Admin |
+| `/api/orders/:id/archive`, `/api/orders/:id/restore` | Archive or restore an order | Admin |
+| `/api/orders/:id/approve`, `/api/orders/:id/status` | Set the quote or advance production/payment status | Admin |
+| `/api/orders/:id/access-link`, `/api/orders/:id/access-link/rotate` | Copy or rotate a private payment link | Admin |
+| `/api/orders/:id/approval-email/resend` | Resend the current quote while awaiting downpayment | Admin |
+| `/` | MongoDB-aware readiness check | Public |
+
+Admin `:id` parameters use the database `_id`, not the public `GP-…` order number. See the [admin order verification guide](docs/admin-order-crud-testing.md) for route methods and detailed checks.
+
+## Getting Started
 
 ### Prerequisites
 
-- Node.js 22.13 or later within the 22.x series, or Node.js 24 or later, with npm. The client tooling also supports Node.js 20.19 or later within 20.x; Node.js 18 is insufficient for the current ESLint tooling.
-- A reachable MongoDB database, locally or through MongoDB Atlas.
-- A Cloudinary account for uploads; Brevo access and a verified sender for approval emails.
+- **Node.js 22.13+ within 22.x, or 24+**, with npm. The current Vite/ESLint combination also supports Node.js 20.19+ within 20.x. Neither package declares an `engines` field.
+- A reachable **MongoDB** database and credentials permitted to create the order collection/indexes.
+- **Cloudinary** credentials for startup and file storage.
+- **Brevo** access and a verified sender to exercise approval emails.
 
-Both package manifests omit an engines declaration. The installed dependency engine ranges were checked with Node.js 22.14.0 and npm 10.9.2.
+### 1. Clone and install
 
-Use separate terminals for the server and client. Each set of commands starts from the repository root; do not install dependencies at the root.
+Repository links match this checkout's configured Git remote. Anonymous checks returned HTTP 404 during this review; access may be restricted or the repository may have moved. Confirm access and the URL if cloning fails.
 
-### Server
+```bash
+git clone https://github.com/antoniopilla/GrandPrint-Website.git
+cd GrandPrint-Website
 
-On a fresh checkout, install the locked dependencies and copy the environment example (PowerShell):
-
-```powershell
 cd server
 npm ci
-Copy-Item .env.example .env
-```
-
-If an environment file already exists, keep it and configure it privately. Fill in the startup settings in the table below, including MONGO_URI: the copied example leaves it empty, and an explicitly empty value fails validation. A local database fallback exists only when MONGO_URI is omitted. Configure the email settings to exercise approval emails; missing email settings record a failed email attempt without preventing approval or server startup.
-
-Then, from `server/`, run:
-
-```powershell
-npm run dev
-```
-
-The server connects to MongoDB before listening. `npm start` runs the server without the development watcher.
-
-### Client
-
-In the second terminal, from the repository root:
-
-```powershell
-cd client
+cd ../client
 npm ci
-Copy-Item .env.example .env
+cd ..
 ```
 
-Keep any existing environment file. Configure VITE_API_URL privately if needed; it may be omitted for local development using the server's default port. It is required for builds and preview.
+All following paths are relative to the repository root, which contains `client/` and `server/`. There is no root `package.json`.
 
-From `client/`, run:
+### 2. Configure environment
 
-```powershell
+Copy the templates only if those environment files do not already exist:
+
+```bash
+cp server/.env.example server/.env
+cp client/.env.example client/.env
+```
+
+In PowerShell, use `Copy-Item server/.env.example server/.env` and `Copy-Item client/.env.example client/.env`.
+
+Set the server's admin password, JWT secret, and Cloudinary credentials. Set `MONGO_URI` to a local URI such as `mongodb://127.0.0.1:27017/printingPOS` or your Atlas connection string: the example leaves it empty, and an explicitly empty value fails validation. The local fallback applies only when the variable is omitted. The Mongoose order model defines the collection fields and indexes.
+
+Configure Brevo, payment accounts, and the contact URL to test approval emails. Missing email settings fail that email attempt without blocking order approval or server startup. See [Environment Variables](#environment-variables).
+
+### 3. Run the API
+
+In the first terminal, from the repository root:
+
+```bash
+cd server
 npm run dev
 ```
 
-Open the local address printed by Vite. The configured development port is 3000.
+The API connects to MongoDB before listening at `http://localhost:5000` by default. `npm start` runs without Nodemon.
 
-Other available client scripts are `npm run build`, `npm run preview`, and `npm run lint`. There is no test script in either package.
+### 4. Run the client
 
-Not verified: a fresh dependency installation or full startup against your MongoDB, Cloudinary, and Brevo accounts. Commands were checked against package scripts, matching lockfiles, and the standard npm and PowerShell commands. The current lint baseline has three existing errors.
+In a second terminal, from the repository root:
 
-## Environment variables
+```bash
+cd client
+npm run dev
+```
 
-Use `server/.env.example` and `client/.env.example` as the templates. Keep actual values private; do not commit environment files. VITE-prefixed variables become public client configuration, so they must not contain secrets.
+Open the address printed by Vite; its configured development port is **3000**. Local development may leave `VITE_API_URL` blank to use `http://localhost:5000`. Builds and preview require an explicit API URL.
 
-### Server
+## Environment Variables
 
-| Name | Required or optional | Purpose |
-| --- | --- | --- |
-| PORT | Optional | Listening port; must be valid when supplied. Render supplies the service port. |
-| NODE_ENV | Required for production deployment; optional locally | Selects runtime mode and enables production configuration checks. |
-| MONGO_URI | Required in production; optional locally if omitted | MongoDB connection string; an empty supplied value is invalid. |
-| CLIENT_URL | Required in production; optional locally | Allowed client origins for CORS, separated by commas; entries are trimmed, trailing slashes removed, and validated as pure HTTP(S) origins. |
-| CUSTOMER_PORTAL_URL | Required in production; optional locally | Canonical payment-link base; HTTPS required in production, with trailing slashes normalized. |
-| ADMIN_PASSWORD | Required at startup | Shared admin login password. |
-| JWT_SECRET | Required at startup | Signs and verifies admin access tokens. |
-| CLOUDINARY_CLOUD_NAME | Required at startup | Cloudinary account identifier for uploads. |
-| CLOUDINARY_API_KEY | Required at startup | Cloudinary API authentication. |
-| CLOUDINARY_API_SECRET | Required at startup | Cloudinary API authentication secret. |
-| EMAIL_USER | Required for approval emails | Sender address, verified with Brevo. |
-| BREVO_API_KEY | Required for approval emails | Authenticates Brevo email requests. |
-| BUSINESS_NAME | Optional | Business branding in approval emails. |
-| GCASH_NAME | Required for approval emails | Account name included in payment instructions. |
-| GCASH_NUMBER | Required for approval emails | Account identifier included in payment instructions. |
-| BPI_NAME | Required for approval emails | Account name included in payment instructions. |
-| BPI_ACCOUNT | Required for approval emails | Account identifier included in payment instructions. |
-| FB_PAGE | Required for approval emails | HTTPS business contact destination in approval emails. |
-| ORDER_ACCESS_RATE_LIMIT_ENABLED | Optional; disabled by default | Controls the per-IP private-link lookup and receipt-upload limiters. |
-| ADMIN_LOGIN_RATE_LIMIT_ENABLED | Optional; disabled by default | Controls the per-IP admin login limiter. |
+Annotated templates live in [`server/.env.example`](server/.env.example) and [`client/.env.example`](client/.env.example). Keep real values private. `VITE_` variables become public client configuration and must not contain secrets.
 
-### Client
+**Client** (`client/.env`)
 
-| Name | Required or optional | Purpose |
-| --- | --- | --- |
-| VITE_API_URL | Required for build, preview, and production; optional for local development | Absolute HTTP(S) backend base URL without credentials, a query, or a fragment. |
+| Variable | Requirement | Purpose |
+|---|---|---|
+| `VITE_API_URL` | Required for builds, preview, and production; optional in local development | Absolute HTTP(S) backend base URL. Credentials, queries, and fragments are rejected; whitespace and trailing slashes are normalized. |
+
+**Server** (`server/.env`)
+
+| Variable | Requirement | Purpose |
+|---|---|---|
+| `PORT` | Optional | Decimal TCP port, 1–65535; defaults to `5000`. Render supplies its service port. |
+| `NODE_ENV` | Set to `production` on deployment | Enables production configuration requirements. |
+| `MONGO_URI` | Required in production; optional locally only when omitted | MongoDB connection string. An empty supplied value is invalid. |
+| `CLIENT_URL` | Required in production | Comma-separated allowed HTTP(S) frontend origins, with no credentials, path, query, fragment, or empty entries. Blank locally permits all origins. |
+| `CUSTOMER_PORTAL_URL` | Required in production | Canonical frontend base for payment links; HTTPS required in production. Defaults locally to `http://localhost:3000`. |
+| `ADMIN_PASSWORD` / `JWT_SECRET` | Required at startup | Shared admin password and JWT signing secret. |
+| `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` | Required at startup | Upload storage and asset cleanup. |
+| `EMAIL_USER` / `BREVO_API_KEY` | Required for approval emails | Brevo-verified sender and ordinary API key. Email uses HTTPS, not SMTP. |
+| `BUSINESS_NAME` | Optional | Sender/email branding; defaults to `GrandPrint`. |
+| `GCASH_NAME` / `GCASH_NUMBER` | Required for approval emails | GCash payment instructions. |
+| `BPI_NAME` / `BPI_ACCOUNT` | Required for approval emails | BPI payment instructions. |
+| `FB_PAGE` | Required for approval emails | Valid HTTPS business contact URL. |
+| `ORDER_ACCESS_RATE_LIMIT_ENABLED` | Optional; off by default | Only `true` enables per-IP customer lookup and payment-upload limiters. |
+| `ADMIN_LOGIN_RATE_LIMIT_ENABLED` | Optional; off by default | Only `true` enables the per-IP admin login limiter. |
 
 ## Deployment
 
-Deploy the client first, then the server.
+- **Frontend (Vercel):** use root directory `client`, Vite framework, install command `npm ci`, build command `npm run build`, and output directory `dist`. Set `VITE_API_URL` before building. [`client/vercel.json`](client/vercel.json) rewrites direct client routes to `index.html`.
+- **Backend (Render):** use a Node web service with root directory `server`, build command `npm ci`, start command `npm start`, and health check path `/`. Select a compatible Node.js runtime and provide production, startup, and email settings from the table above.
+- **Origin and link configuration:** `CLIENT_URL` must allow the deployed frontend origin; `CUSTOMER_PORTAL_URL` must point to its HTTPS base. Both public and admin clients use the same API.
+- **Coordinated updates:** deploy the client before the server for the existing approval-email/resend changes; the client handles an unavailable resend route until the API is updated.
+- **Optional limiters:** leave the IP limiter flags disabled until proxy/client-IP handling is confirmed. Counts are held in process memory, reset on restart, and are not shared across instances.
 
-- **Vercel:** root directory `client`, Vite framework, install command `npm ci`, build command `npm run build`, output directory `dist`. Configure VITE_API_URL before building. The existing rewrite configuration supports direct navigation to client routes.
-- **Render:** Node web service with root directory `server`, build command `npm ci`, start command `npm start`, and health check path `/`. Use a compatible Node.js runtime, configure NODE_ENV for production, and supply all server settings marked required for production, startup, or approval emails above. The health endpoint reports readiness only while MongoDB is connected.
-- Ensure CLIENT_URL permits the frontend origin and CUSTOMER_PORTAL_URL points to its HTTPS base. Leave both IP rate-limit flags disabled until proxy settings are confirmed and enabling them is explicitly approved.
+These settings describe the repository configuration and deployment procedure; live hosting settings and production service behavior have not been confirmed during this documentation update.
 
-Not verified: live hosting settings, deployed runtime versions, and end-to-end production behavior.
+## Order Lifecycle & Usage
 
-## Security notes
+```text
+Pending Approval
+     ↓  admin approves and sets price; email attempt starts
+Awaiting Downpayment
+     ├─ customer uploads receipt → Payment Submitted → admin verifies ─┐
+     └─ admin confirms a verified Messenger payment ───────────────────┤
+                                                                      ↓
+Printing → Completed → Fully Paid
+```
 
-- Customer order lookup and receipt uploads require a private token; an order ID alone does not grant access. Treat payment links as credentials and keep them private.
-- Admin APIs require a signed JWT from the shared-password login; tokens expire after 12 hours.
-- Uploads validate extensions, MIME types, file signatures, and multipart request limits before Cloudinary storage.
-- Both artwork and receipts are limited to 10 MB (10,000,000 bytes). PNG, JPG/JPEG, and PSD headers are checked against a 25-megapixel limit. PDF, AI, and EPS do not have an equivalent pixel-dimension precheck.
-- IP rate limits exist but are disabled by default until proxy settings are confirmed. They use per-process memory, reset on restart, and do not share counts across instances.
+1. **Customer:** submit an order, keep its private link, and wait for the quote email. Pay the instructed 50% downpayment through GCash or BPI and upload the receipt through that link, or send it through Messenger. Pay the remaining balance when the order is complete.
+2. **Admin:** sign in at `/admin/login`, review Pending Approval, and choose **Approve & Set Price**. In On-Going, verify the uploaded or Messenger receipt before starting printing. Mark the order complete, then confirm final payment in Completed.
+3. **Corrections:** open **Edit** on an active order. After approval, only contact details and notes remain editable. Changing the email does not resend the quote; while awaiting downpayment, the notice offers a manual resend. Later statuses require direct customer contact.
+4. **Retention:** archive an order to remove it from the active workspace and customer payment access. Restore it to resume access, or choose **Delete forever** in Archived for permanent removal. Review any file cleanup warning.
 
-## Known limitations
+Approval email acceptance is not confirmation of inbox delivery. Sends use a 10-second provider timeout and a 60-second attempt lease; an unfinished or uncertain attempt becomes Unknown. There are no automatic retries. Resending requires an awaiting-downpayment order with a valid recipient and positive price; Accepted or Unknown attempts require duplicate-send confirmation. Resends reuse the current link, and an active send blocks another send and link rotation.
 
-- Approval emails have no automatic retries; resends require an admin action while awaiting downpayment and a valid stored email and price.
-- Accepted by the email provider is not confirmation of inbox delivery; interrupted or timed-out attempts may have an unknown outcome.
-- Uploads are buffered in memory. Per-request limits exist, but aggregate memory across concurrent uploads is not bounded.
-- Payment collection and receipt verification are manual; there is no payment gateway integration.
+## Available Scripts
 
-**Contributing:** Discuss proposed changes in an issue and submit a focused pull request.
+| Directory | Command | Runs |
+|---|---|---|
+| `client/` | `npm run dev` | Vite development server, configured port `3000` |
+| `client/` | `npm run build` | Production bundle in `client/dist` (requires `VITE_API_URL`) |
+| `client/` | `npm run preview` | Local preview of the built bundle (requires `VITE_API_URL`) |
+| `client/` | `npm run lint` | ESLint over the client |
+| `server/` | `npm run dev` | API with Nodemon |
+| `server/` | `npm start` | API with Node.js |
+| Repository root | `node --test server/tests/order-admin.test.js` | Admin order API regression suite with mocked database and uploads |
 
-**License:** To be decided.
+Neither package defines an `npm test` script. The direct backend test command and client lint passed during this documentation update (89 tests/subtests). Live database, Cloudinary cleanup, and email-delivery checks are described in the [verification guide](docs/admin-order-crud-testing.md).
+
+## Known Limitations
+
+- Payments and receipt verification are manual; the system does not charge accounts or confirm transactions with a bank/payment API.
+- The admin uses one shared password. Signing out removes the client token; no server-side JWT revocation endpoint is included.
+- Both artwork and receipt uploads are limited to **10,000,000 bytes**. PNG, JPG/JPEG, and PSD headers have a 25-megapixel precheck; PDF, AI, and EPS have no equivalent pixel-dimension precheck.
+- Uploads are buffered in memory. Per-request limits do not cap aggregate memory across concurrent uploads.
+- Database deletion can succeed while Cloudinary cleanup fails; the response/UI reports a warning, and failed cleanup needs follow-up. Asset removal and email delivery still require live-service verification.
+- Dashboard updates use polling, and order lists are not paginated. The existing automated suite covers admin API behavior with mocked storage, not a full production workflow.
+
+## License
+
+No license file is included. Contact the maintainer for reuse terms.
+
+## Contact
+
+Built and maintained by **[@antoniopilla](https://github.com/antoniopilla)** · [Repository](https://github.com/antoniopilla/GrandPrint-Website)
