@@ -21,33 +21,42 @@ const parseNumber = (value) => {
   return Number(value.trim());
 };
 
-const validateOrderInput = (body = {}) => {
+const validateOrderInput = (body = {}, { partial = false } = {}) => {
   const values = {};
   const errors = {};
+  const includesField = (field) => !partial || Object.prototype.hasOwnProperty.call(body || {}, field);
   for (const [field, label] of [
     ["customerName", "Customer name"],
     ["email", "Email address"],
     ["contactNumber", "Contact number"],
   ]) {
+    if (!includesField(field)) continue;
     const value = typeof body?.[field] === "string" ? body[field].trim() : "";
     values[field] = value;
     if (!value) errors[field] = `${label} is required.`;
     else if (value.length > LIMITS[field]) errors[field] = `${label} must be ${LIMITS[field]} characters or fewer.`;
   }
-  if (!errors.email && !isValidEmail(values.email)) errors.email = "Enter a valid email address.";
+  if (includesField("email") && !errors.email && !isValidEmail(values.email)) errors.email = "Enter a valid email address.";
 
-  values.productType = typeof body?.productType === "string" ? body.productType.trim() : "";
-  if (!PRODUCT_TYPES.includes(values.productType)) errors.productType = "Select a valid product type.";
+  if (includesField("productType")) {
+    values.productType = typeof body?.productType === "string" ? body.productType.trim() : "";
+    if (!PRODUCT_TYPES.includes(values.productType)) errors.productType = "Select a valid product type.";
+  }
   for (const field of ["width", "height"]) {
+    if (!includesField(field)) continue;
     values[field] = parseNumber(body?.[field]);
     if (!isValidDimension(values[field])) errors[field] = "Enter a dimension greater than 0 and at most 100 feet.";
   }
-  values.pieces = parseNumber(body?.pieces);
-  if (!isValidPieces(values.pieces)) errors.pieces = "Enter a whole number of pieces from 1 to 10,000.";
+  if (includesField("pieces")) {
+    values.pieces = parseNumber(body?.pieces);
+    if (!isValidPieces(values.pieces)) errors.pieces = "Enter a whole number of pieces from 1 to 10,000.";
+  }
 
-  values.notes = body?.notes === undefined ? "" : typeof body.notes === "string" ? body.notes.trim() : "";
-  if (body?.notes !== undefined && typeof body.notes !== "string") errors.notes = "Notes must be text.";
-  else if (values.notes.length > LIMITS.notes) errors.notes = "Notes must be 5,000 characters or fewer.";
+  if (includesField("notes")) {
+    values.notes = body?.notes === undefined ? "" : typeof body.notes === "string" ? body.notes.trim() : "";
+    if (body?.notes !== undefined && typeof body.notes !== "string") errors.notes = "Notes must be text.";
+    else if (values.notes.length > LIMITS.notes) errors.notes = "Notes must be 5,000 characters or fewer.";
+  }
   return { values, errors };
 };
 

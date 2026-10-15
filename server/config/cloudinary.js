@@ -45,4 +45,29 @@ const deleteUploadedAsset = async (result) => {
   return false;
 };
 
-module.exports = { cloudinary, uploadBuffer, deleteUploadedAsset };
+// Older orders retain only the delivery URL, rather than the upload metadata.
+const uploadedAssetFromUrl = (value) => {
+  if (typeof value !== "string" || !value) return null;
+  try {
+    const url = new URL(value);
+    if (!["https:", "http:"].includes(url.protocol) || url.hostname !== "res.cloudinary.com") return null;
+    const parts = url.pathname.split("/").filter(Boolean);
+    const [cloudName, resourceType, type, ...path] = parts;
+    if (
+      !cloudName || !["image", "raw", "video"].includes(resourceType) || type !== "upload" ||
+      (process.env.CLOUDINARY_CLOUD_NAME && cloudName !== process.env.CLOUDINARY_CLOUD_NAME)
+    ) return null;
+
+    // Upload results include a version; it also separates any delivery transforms.
+    const versionIndex = path.findIndex((part) => /^v\d+$/.test(part));
+    const publicPath = versionIndex === -1 ? path : path.slice(versionIndex + 1);
+    let publicId = decodeURIComponent(publicPath.join("/"));
+    if (resourceType !== "raw") publicId = publicId.replace(/\.[^/.]+$/, "");
+    if (!publicId) return null;
+    return { public_id: publicId, resource_type: resourceType, type };
+  } catch {
+    return null;
+  }
+};
+
+module.exports = { cloudinary, uploadBuffer, deleteUploadedAsset, uploadedAssetFromUrl };

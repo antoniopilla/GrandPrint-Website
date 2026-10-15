@@ -17,5 +17,12 @@ export function createAdminApi(onUnauthorized) {
     }
     return Promise.reject(error);
   });
+  api.orders = {
+    list: (archived = false) => api.get("/api/orders", archived ? { params: { archived: true } } : undefined),
+    update: (id, formData) => api.put(`/api/orders/${id}`, formData),
+    archive: (id) => api.put(`/api/orders/${id}/archive`, {}),
+    restore: (id) => api.put(`/api/orders/${id}/restore`, {}),
+    deleteForever: (id) => api.delete(`/api/orders/${id}`),
+  };
   return api;
 }

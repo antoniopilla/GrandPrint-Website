@@ -13,6 +13,10 @@ const {
   getOrderAccessLink,
   rotateOrderAccessLink,
   resendApprovalEmail,
+  updateOrder,
+  archiveOrder,
+  restoreOrder,
+  deleteOrder,
 } = require("../controllers/orderController");
 
 // Files are kept in memory then streamed to Cloudinary in the controller.
@@ -31,6 +35,10 @@ const upload = createValidatedUpload({
 router.get("/", requireAdmin, getOrders);
 router.get("/lookup/:orderId", lookupRateLimit, requireOrderAccess, getOrderByOrderId);
 router.post("/", upload, createOrder);
+router.put("/:id", requireAdmin, upload, updateOrder);
+router.put("/:id/archive", requireAdmin, archiveOrder);
+router.put("/:id/restore", requireAdmin, restoreOrder);
+router.delete("/:id", requireAdmin, deleteOrder);
 router.put("/:id/status", requireAdmin, updateOrderStatus);
 router.put("/:id/approve", requireAdmin, approveOrder);
 router.post("/:id/access-link", requireAdmin, getOrderAccessLink);

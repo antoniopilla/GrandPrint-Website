@@ -30,6 +30,7 @@ const orderSchema = new mongoose.Schema(
     designFile: { type: String },
     price: { type: Number, validate: isValidPrice },
     paymentProof: { type: String },
+    archivedAt: { type: Date, default: null },
     status: {
       type: String,
       default: "Pending Approval",
@@ -61,5 +62,7 @@ const orderSchema = new mongoose.Schema(
     },
   }
 );
+
+orderSchema.index({ archivedAt: 1 });
 
 module.exports = mongoose.model("Order", orderSchema);

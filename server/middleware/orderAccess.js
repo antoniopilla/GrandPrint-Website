@@ -11,7 +11,7 @@ const requireOrderAccess = async (req, res, next) => {
   if (!isValidAccessToken(token)) return invalidLink(res);
 
   try {
-    const order = await Order.findOne({ orderId: req.params.orderId }).select("+accessToken");
+    const order = await Order.findOne({ orderId: req.params.orderId, archivedAt: null }).select("+accessToken");
     if (!order || !compareAccessTokens(token, order.accessToken)) {
       return invalidLink(res);
     }

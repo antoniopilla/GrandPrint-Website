@@ -20,7 +20,9 @@ export default function ThemeToggle({ floating = false }) {
     document.documentElement.setAttribute("data-theme", next);
     try {
       localStorage.setItem("theme", next);
-    } catch (e) {}
+    } catch {
+      // Theme switching still works when browser storage is unavailable.
+    }
     setTheme(next);
   };
 

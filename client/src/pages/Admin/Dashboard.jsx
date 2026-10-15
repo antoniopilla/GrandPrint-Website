@@ -4,6 +4,7 @@ import { createAdminApi } from "../../adminApi";
 import { getApiErrorMessage } from "../../apiErrors";
 import { getApprovalEmailInfo, isValidApprovalEmail } from "../../approvalEmail";
 import ThemeToggle from "../../ThemeToggle";
+import OrderEditor from "./OrderEditor";
 import { useIsMobile } from "../../useMediaQuery";
 import { TriangleAlert, RefreshCw, Inbox, Printer, CircleCheck, Check } from "lucide-react";
 
@@ -27,6 +28,7 @@ export default function AdminDashboard() {
   const adminApi = useMemo(() => createAdminApi(() => nav("/admin/login", { replace: true })), [nav]);
   const isMobile = useIsMobile();
   const [tab, setTab] = useState("pending");
+  const [orderView, setOrderView] = useState("active");
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -42,6 +44,10 @@ export default function AdminDashboard() {
   const [manualLink, setManualLink] = useState("");
   const [emailLoading, setEmailLoading] = useState(null);
   const [emailNotice, setEmailNotice] = useState("");
+  const [emailNoticeOrderId, setEmailNoticeOrderId] = useState(null);
+  const [actionNotice, setActionNotice] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [editOrder, setEditOrder] = useState(null);
   const sidebarRef = useRef(null);
   const mainRef = useRef(null);
   const modalRef = useRef(null);
@@ -50,20 +56,26 @@ export default function AdminDashboard() {
   const refreshButtonRef = useRef(null);
   const listRequestSequenceRef = useRef(0);
   const listApiRef = useRef(null);
-  const isModalOpen = Boolean(modal);
+  const listFetchRef = useRef(null);
+  const listViewRef = useRef(orderView);
+  const dialogBusyRef = useRef(false);
+  listViewRef.current = orderView;
+  const isModalOpen = Boolean(modal || editOrder);
+  const archivedView = orderView === "archived";
 
   const fetchOrders = useCallback(async () => {
-    if (listApiRef.current !== adminApi) return;
+    if (listApiRef.current !== adminApi || listViewRef.current !== orderView) return;
     const requestSequence = ++listRequestSequenceRef.current;
-    const isCurrentRequest = () => listRequestSequenceRef.current === requestSequence && listApiRef.current === adminApi;
+    const isCurrentRequest = () => listRequestSequenceRef.current === requestSequence && listApiRef.current === adminApi && listViewRef.current === orderView;
     setRefreshing(true);
     try {
-      const res = await adminApi.get("/api/orders");
+      const res = await adminApi.orders.list(orderView === "archived");
       if (!isCurrentRequest()) return;
       if (!Array.isArray(res.data)) throw new Error("Invalid orders response");
       setOrders(res.data);
       setHasLoadedOrders(true);
       setListError("");
+      return res.data;
     } catch (err) {
       if (!isCurrentRequest() || err.response?.status === 401) return;
       setListError("Unable to load orders. Please try again.");
@@ -73,7 +85,8 @@ export default function AdminDashboard() {
         setRefreshing(false);
       }
     }
-  }, [adminApi]);
+  }, [adminApi, orderView]);
+  listFetchRef.current = fetchOrders;
 
   useEffect(() => {
     listApiRef.current = adminApi;
@@ -100,13 +113,16 @@ export default function AdminDashboard() {
       'button, input, select, textarea, a[href], [tabindex]:not([tabindex="-1"])'
     )).filter(element => !element.disabled && element.tabIndex >= 0 && element.getClientRects().length > 0);
     const focusInside = () => {
-      const target = !priceRef.current?.disabled ? priceRef.current : focusableElements()[0];
+      const target = priceRef.current && !priceRef.current.disabled ? priceRef.current : focusableElements()[0];
       (target || dialog).focus();
     };
     const handleKeyDown = event => {
       if (event.key === "Escape") {
         event.preventDefault();
-        setModal(null);
+        if (!dialogBusyRef.current) {
+          setModal(null);
+          setEditOrder(null);
+        }
       } else if (event.key === "Tab") {
         const elements = focusableElements();
         const first = elements[0];
@@ -168,6 +184,7 @@ export default function AdminDashboard() {
     }
     const approvalOrderId = modal._id;
     setApproving(true);
+    dialogBusyRef.current = true;
     try {
       await adminApi.put(`/api/orders/${approvalOrderId}/approve`, { price: p });
       await fetchOrders();
@@ -178,6 +195,7 @@ export default function AdminDashboard() {
       alert(getApiErrorMessage(err, "Approval failed. Please try again."));
     } finally {
       setApproving(false);
+      dialogBusyRef.current = false;
     }
   };
 
@@ -222,6 +240,7 @@ export default function AdminDashboard() {
     if (confirmDuplicate && !window.confirm("This approval email may already have been accepted by the email provider. Sending it again could create a duplicate email. Resend anyway?")) return;
     setEmailLoading(order._id);
     setEmailNotice("");
+    setEmailNoticeOrderId(null);
     try {
       await adminApi.post(`/api/orders/${order._id}/approval-email/resend`, { confirmDuplicate });
       setEmailNotice("Approval email send started. Refresh to check its status.");
@@ -237,10 +256,77 @@ export default function AdminDashboard() {
     }
   };
 
+  const switchOrderView = (nextView) => {
+    if (nextView === orderView) return;
+    listRequestSequenceRef.current += 1;
+    setOrderView(nextView);
+    setOrders([]);
+    setLoading(true);
+    setHasLoadedOrders(false);
+    setListError("");
+  };
+
+  const saveOrderDetails = async (original, data) => {
+    const res = await adminApi.orders.update(original._id, data);
+    const updated = res.data;
+    listRequestSequenceRef.current += 1;
+    setOrders(current => current.map(order => order._id === updated._id ? updated : order));
+    setEditOrder(null);
+    setActionError("");
+    setActionNotice(`Order updated.${updated.cleanupWarning ? ` ${updated.cleanupWarning}` : ""}`);
+    const previousEmail = String(original.email ?? "").trim();
+    const currentEmail = String(updated.email ?? "").trim();
+    const oldAddress = previousEmail || "missing email address";
+    if (previousEmail.toLowerCase() !== currentEmail.toLowerCase() && updated.status !== "Pending Approval") {
+      if (updated.status === "Awaiting Downpayment") {
+        setEmailNotice(`Email updated to ${currentEmail}. The approval email went to the old address (${oldAddress}). Resend it to send the quote and payment link to the new address.`);
+        setEmailNoticeOrderId(updated._id);
+      } else {
+        setEmailNotice(`Email updated to ${currentEmail}. The quote and payment link went to the old address (${oldAddress}). Resend is only available while awaiting downpayment; contact the customer directly.`);
+        setEmailNoticeOrderId(null);
+      }
+    }
+    await listFetchRef.current?.();
+  };
+
+  const refreshEditedOrder = async (id) => {
+    const latestOrders = await fetchOrders();
+    const latest = latestOrders?.find(order => order._id === id);
+    if (latest) setEditOrder(latest);
+    return latest;
+  };
+
+  const changeArchiveState = async (order, action) => {
+    if (actionLoading) return;
+    if (action === "deleteForever" && !window.confirm(`Delete ${order.orderId} forever? This permanently deletes the order and its uploaded files and cannot be undone.`)) return;
+    if (action === "archive" && !window.confirm(`Archive ${order.orderId}? It will be hidden from active orders and customer access until restored.`)) return;
+    setActionLoading(order._id);
+    setActionError("");
+    setActionNotice("");
+    const sourceView = listViewRef.current;
+    try {
+      const res = await adminApi.orders[action](order._id);
+      if (listViewRef.current === sourceView) {
+        listRequestSequenceRef.current += 1;
+        setOrders(current => current.filter(item => item._id !== order._id));
+      }
+      const message = action === "archive" ? "Order archived." : action === "restore" ? "Order restored to Active." : "Order permanently deleted.";
+      setActionNotice(`${message}${res.data.cleanupWarning ? ` ${res.data.cleanupWarning}` : ""}`);
+      await listFetchRef.current?.();
+    } catch (err) {
+      if (err.response?.status === 401) return;
+      if ([404, 409].includes(err.response?.status)) await listFetchRef.current?.();
+      setActionError(getApiErrorMessage(err, "Unable to update this order. Please refresh and try again."));
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const currentTab = TABS.find(t => t.key === tab);
-  const shown = orders.filter(o => currentTab.statuses.includes(o.status));
+  const shown = archivedView ? orders : orders.filter(o => currentTab.statuses.includes(o.status));
   const counts = Object.fromEntries(TABS.map(t => [t.key, orders.filter(o => t.statuses.includes(o.status)).length]));
-  const totalPending = counts.pending || 0;
+  const totalPending = archivedView ? 0 : counts.pending || 0;
+  const emailNoticeOrder = emailNoticeOrderId ? orders.find(order => order._id === emailNoticeOrderId) : null;
 
   return (
     <div style={{ ...s.root, ...(isMobile ? s.rootMobile : {}) }}>
@@ -256,7 +342,7 @@ export default function AdminDashboard() {
           )}
         </div>
 
-        <nav style={{ ...s.nav, ...(isMobile ? s.navMobile : {}) }}>
+        <nav aria-label="Order status" style={{ ...s.nav, ...(isMobile ? s.navMobile : {}), ...(archivedView ? { display: "none" } : {}) }}>
           {TABS.map(t => (
             <button
               key={t.key}
@@ -293,7 +379,7 @@ export default function AdminDashboard() {
       <main ref={mainRef} style={{ ...s.main, ...(isMobile ? s.mainMobile : {}) }}>
         <div style={s.header}>
           <div>
-            <h1 style={{ ...s.pageTitle, ...(isMobile ? s.pageTitleMobile : {}) }}>{currentTab.label}</h1>
+            <h1 style={{ ...s.pageTitle, ...(isMobile ? s.pageTitleMobile : {}) }}>{archivedView ? "Archived Orders" : currentTab.label}</h1>
             {hasLoadedOrders && <p style={s.pageSub}>{shown.length} order{shown.length !== 1 ? "s" : ""}</p>}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -303,6 +389,15 @@ export default function AdminDashboard() {
             </button>
           </div>
         </div>
+
+        <div role="group" aria-label="Order archive view" style={s.viewToggle}>
+          {[ ["active", "Active"], ["archived", "Archived"] ].map(([value, label]) => (
+            <button key={value} type="button" aria-pressed={orderView === value} onClick={() => switchOrderView(value)} style={{ ...s.viewButton, ...(orderView === value ? s.viewButtonOn : {}) }}>{label}</button>
+          ))}
+        </div>
+
+        {actionNotice && <p role="status" style={s.actionNotice}>{actionNotice}</p>}
+        {actionError && <p role="alert" style={{ ...s.actionNotice, color: "var(--red)" }}>{actionError}</p>}
 
         {linkNotice && (
           <div role="status" style={{ marginBottom: 16, color: "var(--text2)" }}>
@@ -314,7 +409,14 @@ export default function AdminDashboard() {
         )}
 
         {emailNotice && (
-          <p role="status" style={{ marginBottom: 16, color: "var(--text2)" }}>{emailNotice}</p>
+          <div role="status" style={s.emailNotice}>
+            <p>{emailNotice}</p>
+            {!archivedView && emailNoticeOrder?.status === "Awaiting Downpayment" && (
+              <ActionBtn color="var(--blue)" bg="var(--blue-light)" onClick={() => resendApprovalEmail(emailNoticeOrder)} loading={emailLoading === emailNoticeOrder._id} disabled={getApprovalEmailInfo(emailNoticeOrder)?.isSending || !isValidApprovalEmail(emailNoticeOrder.email)}>
+                Resend approval email
+              </ActionBtn>
+            )}
+          </div>
         )}
 
         {listError && (
@@ -351,6 +453,15 @@ export default function AdminDashboard() {
                 linkLoading={linkLoading === order._id}
                 onResendEmail={resendApprovalEmail}
                 emailLoading={emailLoading === order._id}
+                archived={archivedView}
+                onEdit={event => {
+                  approvalTriggerRef.current = event.currentTarget;
+                  setEditOrder(order);
+                }}
+                onArchive={() => changeArchiveState(order, "archive")}
+                onRestore={() => changeArchiveState(order, "restore")}
+                onDelete={() => changeArchiveState(order, "deleteForever")}
+                archiveActionDisabled={Boolean(actionLoading)}
               />
             ))}
           </div>
@@ -359,7 +470,7 @@ export default function AdminDashboard() {
 
       {/* ── Approve Modal ── */}
       {modal && (
-        <div style={s.overlay} onClick={() => setModal(null)}>
+        <div style={s.overlay} onClick={() => { if (!dialogBusyRef.current) setModal(null); }}>
           <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="approval-dialog-title" aria-describedby="approval-dialog-description" tabIndex={-1} style={{ ...s.modal, ...(isMobile ? s.modalMobile : {}) }} className="au" onClick={e => e.stopPropagation()}>
             <h2 id="approval-dialog-title" style={s.modalTitle}>Approve & Set Price</h2>
             <p id="approval-dialog-description" style={s.modalSub}>
@@ -416,7 +527,7 @@ export default function AdminDashboard() {
             )}
 
             <div style={s.modalBtns}>
-              <button style={s.cancelBtn} onClick={() => setModal(null)}>Cancel</button>
+              <button style={s.cancelBtn} disabled={approving} onClick={() => setModal(null)}>Cancel</button>
               <button
                 style={{ ...s.approveBtn, opacity: !Number.isFinite(Number(price)) || Number(price) <= 0 || approving ? 0.5 : 1 }}
                 onClick={doApprove}
@@ -428,12 +539,15 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
+      {editOrder && (
+        <OrderEditor key={editOrder._id} order={editOrder} dialogRef={modalRef} busyRef={dialogBusyRef} onClose={() => setEditOrder(null)} onSave={saveOrderDetails} onQuoteLocked={refreshEditedOrder} />
+      )}
     </div>
   );
 }
 
 /* ── Order Card ── */
-function OrderCard({ order, onApprove, onStatusChange, actionLoading, onPaymentLink, linkLoading, onResendEmail, emailLoading }) {
+function OrderCard({ order, onApprove, onStatusChange, actionLoading, onPaymentLink, linkLoading, onResendEmail, emailLoading, archived, onEdit, onArchive, onRestore, onDelete, archiveActionDisabled }) {
   const sc = STATUS[order.status] || {};
   const date = new Date(order.createdAt).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
   const emailInfo = getApprovalEmailInfo(order);
@@ -454,7 +568,7 @@ function OrderCard({ order, onApprove, onStatusChange, actionLoading, onPaymentL
           Approval email: <span style={{ ...s.statusPill, background: "var(--bg3)", color: "var(--text2)", whiteSpace: "normal", display: "inline-block" }}>{emailInfo.label}</span>
         </p>
       )}
-      {order.status === "Awaiting Downpayment" && invalidEmail && (
+      {!archived && order.status === "Awaiting Downpayment" && invalidEmail && (
         <p style={{ marginBottom: 14, fontSize: 12, color: "var(--orange)" }}>
           Cannot resend: this order has a missing or invalid email address.
         </p>
@@ -466,6 +580,7 @@ function OrderCard({ order, onApprove, onStatusChange, actionLoading, onPaymentL
           ["Size", `${order.width}' × ${order.height}'`],
           ["Pieces", `${order.pieces} pcs`],
           ["Date", date],
+          ...(archived && order.archivedAt ? [["Archived", new Date(order.archivedAt).toLocaleDateString("en-PH")]] : []),
           ...(order.price ? [["Price", `₱${Number(order.price).toLocaleString("en-PH", { minimumFractionDigits: 2 })}`]] : []),
         ].map(([l, v]) => (
           <div key={l} style={{ minWidth: 0 }}>
@@ -495,6 +610,14 @@ function OrderCard({ order, onApprove, onStatusChange, actionLoading, onPaymentL
               View / Download Artwork
             </a>
           )}
+          {archived ? (
+            <>
+              <ActionBtn color="var(--blue)" bg="var(--blue-light)" onClick={onRestore} loading={actionLoading} disabled={archiveActionDisabled}>Restore</ActionBtn>
+              <ActionBtn color="var(--red)" bg="var(--bg3)" onClick={onDelete} loading={actionLoading} disabled={archiveActionDisabled}>Delete forever</ActionBtn>
+            </>
+          ) : <>
+          <ActionBtn color="var(--blue)" bg="var(--blue-light)" onClick={onEdit} disabled={actionLoading}>Edit</ActionBtn>
+          <ActionBtn color="var(--text2)" bg="var(--bg3)" onClick={onArchive} loading={actionLoading} disabled={archiveActionDisabled}>Archive</ActionBtn>
           <ActionBtn color="var(--text2)" bg="var(--bg3)" onClick={() => onPaymentLink(order._id)} loading={linkLoading}>
             Copy payment link
           </ActionBtn>
@@ -550,6 +673,7 @@ function OrderCard({ order, onApprove, onStatusChange, actionLoading, onPaymentL
           {order.status === "Fully Paid" && (
             <span style={{ fontSize: 13, color: "var(--text3)", fontStyle: "italic" }}>Order complete</span>
           )}
+          </>}
         </div>
       </div>
     </div>
@@ -585,6 +709,11 @@ const s = {
   header: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28, flexWrap: "wrap", gap: 16 },
   pageTitle: { fontSize: 28, fontWeight: 800, letterSpacing: "-0.025em", marginBottom: 2 },
   pageSub: { fontSize: 13, color: "var(--text2)" },
+  viewToggle: { display: "inline-flex", flexWrap: "wrap", gap: 4, background: "var(--bg3)", padding: 4, borderRadius: 980, marginBottom: 20 },
+  viewButton: { border: "none", background: "none", color: "var(--text2)", fontSize: 13, fontWeight: 600, borderRadius: 980, padding: "9px 20px", fontFamily: "var(--font)" },
+  viewButtonOn: { background: "var(--bg)", color: "var(--text)", boxShadow: "var(--shadow)" },
+  actionNotice: { marginBottom: 16, fontSize: 14, lineHeight: 1.6, color: "var(--text2)", overflowWrap: "anywhere" },
+  emailNotice: { display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 10, background: "var(--blue-light)", color: "var(--text2)", padding: "14px 16px", borderRadius: "var(--r-sm)", marginBottom: 16, fontSize: 14, lineHeight: 1.6, overflowWrap: "anywhere" },
   refreshBtn: { background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 980, padding: "8px 16px", fontSize: 13, fontWeight: 500, color: "var(--text2)", cursor: "pointer", fontFamily: "var(--font)", display: "inline-flex", alignItems: "center", gap: 6 },
   list: { display: "flex", flexDirection: "column", gap: 14 },
   listError: { background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--r-sm)", padding: 16, marginBottom: 16, color: "var(--text2)", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 },

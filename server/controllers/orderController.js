@@ -1,6 +1,7 @@
 const crypto = require("crypto");
+const mongoose = require("mongoose");
 const Order = require("../models/Order");
-const { uploadBuffer, deleteUploadedAsset } = require("../config/cloudinary");
+const { uploadBuffer, deleteUploadedAsset, uploadedAssetFromUrl } = require("../config/cloudinary");
 const { generateAccessToken } = require("../utils/orderAccess");
 const { buildPaymentLink } = require("../config/customerPortal");
 const { validateEmailSettings } = require("../utils/emailService");
@@ -21,6 +22,30 @@ const invalidResendPrice = (res) => res.status(400).json({
   code: "EMAIL_INVALID_PRICE",
   message: "Cannot resend: this order has a missing or invalid price.",
 });
+const PRICING_FIELDS = ["productType", "width", "height", "pieces"];
+const invalidOrderId = (res) => res.status(400).json({
+  code: "INVALID_REQUEST",
+  message: "Invalid order details or order ID.",
+});
+const archivedOrderConflict = (res) => res.status(409).json({
+  code: "ORDER_ARCHIVED",
+  message: "This order is archived. Restore it before editing.",
+});
+const quoteLocked = (res, blockedFields) => res.status(409).json({
+  code: "QUOTE_LOCKED",
+  message: "The design file and size/quantity/product details can't be changed after the order has been approved. Please refresh the order.",
+  blockedFields,
+});
+const cleanupAsset = async (asset, context) => {
+  try {
+    if (asset && await deleteUploadedAsset(asset)) return true;
+  } catch (err) {
+    console.error(`${context}:`, err);
+    return false;
+  }
+  console.error(`${context}: unable to delete the uploaded asset.`);
+  return false;
+};
 
 const provisionAccessToken = async (id) => {
   const order = await Order.findById(id).select("+accessToken");
@@ -115,10 +140,147 @@ exports.createOrder = async (req, res) => {
 // GET /api/orders
 exports.getOrders = async (req, res) => {
   try {
-    const orders = await Order.find().select("+approvalEmail").sort({ createdAt: -1 });
+    const archivedAt = req.query.archived === "true" ? { $ne: null } : null;
+    const orders = await Order.find({ archivedAt }).select("+approvalEmail").sort({ createdAt: -1 });
     res.json(orders.map((order) => serializeAdminOrder(order)));
   } catch (err) {
     sendApiError(res, err, "Server Error", "getOrders");
+  }
+};
+
+// PUT /api/orders/:id — edit customer-submitted details and an optional design.
+exports.updateOrder = async (req, res) => {
+  let uploadedAsset;
+  let uploadPersisted = false;
+  try {
+    if (!mongoose.isObjectIdOrHexString(req.params.id)) return invalidOrderId(res);
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ message: "Order not found" });
+    if (order.archivedAt) return archivedOrderConflict(res);
+
+    // The shared validator returns only explicitly allowed, present detail fields.
+    const { values, errors } = validateOrderInput(req.body, { partial: true });
+    if (Object.keys(errors).length) return sendValidationErrors(res, errors);
+    if (!Object.keys(values).length && !req.file) {
+      return sendValidationErrors(res, { fields: "Provide an editable order detail or a replacement design file." });
+    }
+
+    const blockedFields = PRICING_FIELDS.filter((field) =>
+      Object.prototype.hasOwnProperty.call(values, field) && values[field] !== order[field]
+    );
+    if (req.file) blockedFields.push("designFile");
+    if (blockedFields.length && order.status !== "Pending Approval") return quoteLocked(res, blockedFields);
+
+    // Omit unchanged quote fields so a complete form can still edit contact details
+    // after approval, without writing a stale quote back during a concurrent update.
+    for (const field of PRICING_FIELDS) {
+      if (Object.prototype.hasOwnProperty.call(values, field) && values[field] === order[field]) delete values[field];
+    }
+    const filter = { _id: order._id, archivedAt: null };
+    if (blockedFields.length) filter.status = "Pending Approval";
+    if (req.file) {
+      // Two replacements must not both clean up the same stale original file.
+      filter.designFile = order.designFile || null;
+      try {
+        uploadedAsset = await uploadBuffer(req.file.buffer, "grandprint/designs");
+      } catch (uploadError) {
+        console.error("Design replacement upload failed:", uploadError);
+        return res.status(422).json({
+          message: "We could not accept this file. Please try another file or message us on Messenger.",
+          contactUrl: "https://www.messenger.com/t/61551691632716",
+        });
+      }
+      values.designFile = uploadedAsset.secure_url;
+    }
+
+    const updatedOrder = await Order.findOneAndUpdate(
+      filter,
+      { $set: values },
+      { new: true, runValidators: true }
+    ).select("+approvalEmail");
+    if (!updatedOrder) {
+      if (uploadedAsset) {
+        await cleanupAsset(uploadedAsset, "Unused replacement design cleanup failed");
+        uploadedAsset = undefined;
+      }
+      const currentOrder = await Order.findById(req.params.id);
+      if (!currentOrder) return res.status(404).json({ message: "Order not found" });
+      if (currentOrder.archivedAt) return archivedOrderConflict(res);
+      if (blockedFields.length && currentOrder.status !== "Pending Approval") return quoteLocked(res, blockedFields);
+      return res.status(409).json({ code: "ORDER_CONFLICT", message: "The order changed while saving. Please refresh and try again." });
+    }
+    uploadPersisted = true;
+
+    const response = serializeAdminOrder(updatedOrder);
+    if (uploadedAsset && order.designFile && order.designFile !== uploadedAsset.secure_url) {
+      const cleanedUp = await cleanupAsset(uploadedAssetFromUrl(order.designFile), "Previous design cleanup failed");
+      if (!cleanedUp) response.cleanupWarning = "The order was saved, but the previous design file could not be removed.";
+    }
+    return res.json(response);
+  } catch (err) {
+    if (uploadedAsset && !uploadPersisted) await cleanupAsset(uploadedAsset, "Unused replacement design cleanup failed");
+    return sendApiError(res, err, "Unable to update order", "updateOrder");
+  }
+};
+
+// PUT /api/orders/:id/archive — remove an active order from the working list.
+exports.archiveOrder = async (req, res) => {
+  try {
+    if (!mongoose.isObjectIdOrHexString(req.params.id)) return invalidOrderId(res);
+    const order = await Order.findOneAndUpdate(
+      { _id: req.params.id, archivedAt: null },
+      { $set: { archivedAt: new Date() } },
+      { new: true, runValidators: true }
+    ).select("+approvalEmail");
+    if (!order) {
+      if (!await Order.exists({ _id: req.params.id })) return res.status(404).json({ message: "Order not found" });
+      return res.status(409).json({ code: "ALREADY_ARCHIVED", message: "This order is already archived." });
+    }
+    return res.json(serializeAdminOrder(order));
+  } catch (err) {
+    return sendApiError(res, err, "Unable to archive order", "archiveOrder");
+  }
+};
+
+// PUT /api/orders/:id/restore — return an archived order to the working list.
+exports.restoreOrder = async (req, res) => {
+  try {
+    if (!mongoose.isObjectIdOrHexString(req.params.id)) return invalidOrderId(res);
+    const order = await Order.findOneAndUpdate(
+      { _id: req.params.id, archivedAt: { $ne: null } },
+      { $set: { archivedAt: null } },
+      { new: true, runValidators: true }
+    ).select("+approvalEmail");
+    if (!order) {
+      if (!await Order.exists({ _id: req.params.id })) return res.status(404).json({ message: "Order not found" });
+      return res.status(409).json({ code: "NOT_ARCHIVED", message: "This order is not archived." });
+    }
+    return res.json(serializeAdminOrder(order));
+  } catch (err) {
+    return sendApiError(res, err, "Unable to restore order", "restoreOrder");
+  }
+};
+
+// DELETE /api/orders/:id — permanently remove only an already archived order.
+exports.deleteOrder = async (req, res) => {
+  try {
+    if (!mongoose.isObjectIdOrHexString(req.params.id)) return invalidOrderId(res);
+    const order = await Order.findOneAndDelete({ _id: req.params.id, archivedAt: { $ne: null } });
+    if (!order) {
+      if (!await Order.exists({ _id: req.params.id })) return res.status(404).json({ message: "Order not found" });
+      return res.status(409).json({ code: "NOT_ARCHIVED", message: "Archive this order before permanently deleting it." });
+    }
+
+    const cleanupResults = await Promise.all([order.designFile, order.paymentProof]
+      .filter(Boolean)
+      .map((url) => cleanupAsset(uploadedAssetFromUrl(url), "Deleted order file cleanup failed")));
+    const response = { message: "Order permanently deleted.", orderId: order.orderId };
+    if (cleanupResults.some((cleanedUp) => !cleanedUp)) {
+      response.cleanupWarning = "The order was deleted, but some uploaded files could not be removed.";
+    }
+    return res.json(response);
+  } catch (err) {
+    return sendApiError(res, err, "Unable to delete order", "deleteOrder");
   }
 };
 
