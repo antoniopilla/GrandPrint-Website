@@ -25,3 +25,6 @@ npm-debug.log*
 .vscode/
 .idea/
 Thumbs.db
+
+# Isolated portfolio screenshot runtime; never public product data.
+/.portfolio-demo/
