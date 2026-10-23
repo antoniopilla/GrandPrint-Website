@@ -51,7 +51,7 @@ const sendApprovalEmail = async (order) => {
 
   <!-- Header -->
   <div style="background:#1d1d1f;padding:32px 40px;">
-    <p style="margin:0;font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#6e6e73;">${escapeHtml(process.env.BUSINESS_NAME || "GrandPrint")}</p>
+    <p style="margin:0;font-size:12px;font-weight:700;letter-spacing:0.12em;color:#6e6e73;">${escapeHtml(process.env.BUSINESS_NAME || "GrandPrint")}</p>
     <h1 style="margin:8px 0 0;font-size:24px;font-weight:700;color:#ffffff;line-height:1.2;">Order Approved</h1>
   </div>
 
